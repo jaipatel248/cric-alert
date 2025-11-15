@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { formatDateTime, formatTime } from '../utils/dateFormatter';
 import {
   Box,
   Paper,
@@ -249,7 +250,7 @@ const AlertDetail: React.FC = () => {
                 Created
               </Typography>
               <Typography variant='body1'>
-                {new Date(monitor.created_at).toLocaleString()}
+                {formatDateTime(monitor.created_at)}
               </Typography>
             </Grid>
             <Grid size={{ xs: 12 }}>
@@ -406,9 +407,9 @@ const AlertDetail: React.FC = () => {
                 <Typography variant='body1'>{monitor.alert_text}</Typography>
                 <Typography
                   variant='caption'
-                  sx={{ mt: 1, display: "block", opacity: 0.7 }}
+                  sx={{ mt: 1, display: 'block', opacity: 0.7 }}
                 >
-                  {new Date(monitor.created_at).toLocaleTimeString()}
+                  {formatTime(monitor.created_at)}
                 </Typography>
               </CardContent>
             </Card>
@@ -485,9 +486,9 @@ const AlertDetail: React.FC = () => {
                     <Typography
                       variant='caption'
                       color='text.secondary'
-                      sx={{ mt: 1, display: "block" }}
+                      sx={{ mt: 1, display: 'block' }}
                     >
-                      {new Date(alert.timestamp).toLocaleString()}
+                      {formatDateTime(alert.timestamp)}
                     </Typography>
                   </CardContent>
                 </Card>

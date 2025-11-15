@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { formatDateTime } from '../utils/dateFormatter';
 import {
   Box,
   Typography,
@@ -218,7 +219,7 @@ const AlertsList: React.FC = () => {
                   </TableCell>
                   <TableCell>
                     <Typography variant='body2' color='text.secondary'>
-                      {new Date(alert.created_at).toLocaleString()}
+                      {formatDateTime(alert.created_at)}
                     </Typography>
                   </TableCell>
                   <TableCell align='center' onClick={(e) => e.stopPropagation()}>
