@@ -38,25 +38,37 @@ const Header: React.FC = () => {
               color="inherit"
               component={RouterLink}
               to="/"
-              startIcon={<HomeIcon />}
+              startIcon={<HomeIcon sx={{ display: { xs: 'none', sm: 'block' } }} />}
+              sx={{ minWidth: { xs: 'auto', sm: 'auto' } }}
             >
-              Home
+              <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
+                Home
+              </Box>
+              <HomeIcon sx={{ display: { xs: 'block', sm: 'none' } }} />
             </Button>
             <Button
               color="inherit"
               component={RouterLink}
               to="/monitor"
-              startIcon={<NotificationsActiveIcon />}
+              startIcon={<NotificationsActiveIcon sx={{ display: { xs: 'none', sm: 'block' } }} />}
+              sx={{ minWidth: { xs: 'auto', sm: 'auto' } }}
             >
-              Monitor
+              <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
+                Monitor
+              </Box>
+              <NotificationsActiveIcon sx={{ display: { xs: 'block', sm: 'none' } }} />
             </Button>
             <Button
               color="inherit"
               component={RouterLink}
               to="/alerts"
-              startIcon={<ListAltIcon />}
+              startIcon={<ListAltIcon sx={{ display: { xs: 'none', sm: 'block' } }} />}
+              sx={{ minWidth: { xs: 'auto', sm: 'auto' } }}
             >
-              Alerts
+              <Box component="span" sx={{ display: { xs: 'none', sm: 'inline' } }}>
+                Alerts
+              </Box>
+              <ListAltIcon sx={{ display: { xs: 'block', sm: 'none' } }} />
             </Button>
           </Box>
         </Toolbar>

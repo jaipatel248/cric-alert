@@ -15,6 +15,8 @@ import {
   Card,
   CardContent,
   Grid,
+  useTheme,
+  useMediaQuery,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import RefreshIcon from "@mui/icons-material/Refresh";
@@ -25,6 +27,8 @@ import { AlertMonitor, AlertType, MonitorStatus } from "../types";
 const AlertDetail: React.FC = () => {
   const { monitorId } = useParams<{ monitorId: string }>();
   const navigate = useNavigate();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [monitor, setMonitor] = useState<AlertMonitor | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -185,18 +189,18 @@ const AlertDetail: React.FC = () => {
         <Box display='flex' gap={1}>
           <Button
             variant='outlined'
-            startIcon={<RefreshIcon />}
+            startIcon={!isMobile ? <RefreshIcon /> : undefined}
             onClick={fetchMonitorDetail}
           >
-            Refresh
+            {isMobile ? <RefreshIcon /> : 'Refresh'}
           </Button>
           <Button
             variant='outlined'
             color='error'
-            startIcon={<DeleteIcon />}
+            startIcon={!isMobile ? <DeleteIcon /> : undefined}
             onClick={handleDelete}
           >
-            Delete
+            {isMobile ? <DeleteIcon /> : 'Delete'}
           </Button>
         </Box>
       </Box>
@@ -407,7 +411,7 @@ const AlertDetail: React.FC = () => {
                 <Typography variant='body1'>{monitor.alert_text}</Typography>
                 <Typography
                   variant='caption'
-                  sx={{ mt: 1, display: 'block', opacity: 0.7 }}
+                  sx={{ mt: 1, display: "block", opacity: 0.7 }}
                 >
                   {formatTime(monitor.created_at)}
                 </Typography>
@@ -486,7 +490,7 @@ const AlertDetail: React.FC = () => {
                     <Typography
                       variant='caption'
                       color='text.secondary'
-                      sx={{ mt: 1, display: 'block' }}
+                      sx={{ mt: 1, display: "block" }}
                     >
                       {formatDateTime(alert.timestamp)}
                     </Typography>

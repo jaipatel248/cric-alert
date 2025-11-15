@@ -20,6 +20,36 @@ const theme = createTheme({
   },
   typography: {
     fontFamily: "Roboto, Arial, sans-serif",
+    h1: {
+      "@media (max-width:600px)": {
+        fontSize: "2rem",
+      },
+    },
+    h2: {
+      "@media (max-width:600px)": {
+        fontSize: "1.75rem",
+      },
+    },
+    h3: {
+      "@media (max-width:600px)": {
+        fontSize: "1.5rem",
+      },
+    },
+    h4: {
+      "@media (max-width:600px)": {
+        fontSize: "1.25rem",
+      },
+    },
+    h5: {
+      "@media (max-width:600px)": {
+        fontSize: "1.1rem",
+      },
+    },
+    h6: {
+      "@media (max-width:600px)": {
+        fontSize: "1rem",
+      },
+    },
   },
 });
 
