@@ -2,8 +2,9 @@
 Pydantic models for request/response schemas
 """
 from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Literal
 from datetime import datetime
+from app.models.enums import AlertType, MonitorStatus
 
 
 class AlertRequest(BaseModel):
@@ -19,7 +20,7 @@ class AlertResponse(BaseModel):
     match_id: int
     alert_text: str
     rules: Dict[str, Any]
-    status: str
+    status: Literal["monitoring", "approaching", "imminent", "triggered", "aborted", "completed", "stopped", "error", "deleted"]
     message: str
     created_at: str
 
@@ -30,8 +31,10 @@ class MonitorInfo(BaseModel):
     match_id: int
     alert_text: str
     running: bool
+    status: Literal["monitoring", "approaching", "imminent", "triggered", "aborted", "completed", "stopped", "error", "deleted"]
     created_at: str
     alerts_count: int
+    last_alert_message: Optional[str] = None
 
 
 class MonitorDetail(MonitorInfo):

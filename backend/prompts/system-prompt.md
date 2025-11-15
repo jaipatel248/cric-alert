@@ -56,7 +56,8 @@ You monitor a live cricket commentary JSON feed and decide whether user-defined 
 
    * `SOFT_ALERT` (within approach window)
    * `HARD_ALERT` (one run away)
-   * `REACHED` (just hit target)
+   * `TRIGGER` (just hit target or exact match for conditions)
+   * `ABORTED` (cannot reach target anymore)
 4. For conditions, evaluate boolean expressions on stats/events/text.
 5. Deduplicate per scope (`over`, `innings`, `match`) using `state`.
 6. Return deterministic JSON with all current alerts.
@@ -65,28 +66,26 @@ You monitor a live cricket commentary JSON feed and decide whether user-defined 
 
 ```json
 {
-  "alerts": [
-    {
-      "type": "SOFT_ALERT|HARD_ALERT|REACHED|TRIGGER",
-      "entityType": "batter|bowler|team|partnership|innings|match|event|session",
-      "entity": {"id": 10744, "name": "Rishabh Pant", "teamShort": "INDA"},
-      "inningsId": 3,
-      "matchId": 119888,
-      "context": {
-        "currentValue": 48, "target": 50, "runsToTarget": 2,
-        "ballNbr": 171, "overNumber": 28.3, "event": "FOUR"
-      },
-      "reason": "within_window|one_away|reached|condition_met",
-      "message": "Pant 48* — 2 short of fifty"
-    }
-  ],
+  "alert": {
+    "type": "SOFT_ALERT|HARD_ALERT|TRIGGER|ABORTED",
+    "entityType": "batter|bowler|team|partnership|innings|match|event|session",
+    "entity": {"id": 10744, "name": "Rishabh Pant", "teamShort": "INDA"},
+    "inningsId": 3,
+    "matchId": 119888,
+    "context": {
+      "currentValue": 48, "target": 50, "runsToTarget": 2,
+      "ballNbr": 171, "overNumber": 28.3, "event": "FOUR"
+    },
+    "reason": "within_window|one_away|reached|condition_met|aborted",
+    "message": "Pant 48* — 2 short of fifty"
+  },
   "state": { "lastAlerted": {}, "snapshots": {} }
 }
 ```
 
 ### NOTES
 
-* `alerts` can be empty.
+* `alert` can be null if no condition is met.
 * Always include latest `ballNbr` and `overNumber`.
 * Keep messages short (e.g., `Pant 99* — one away from century`).
 * Clear innings or match-level state when those change.

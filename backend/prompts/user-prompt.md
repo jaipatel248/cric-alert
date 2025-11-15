@@ -8,25 +8,23 @@ Current watcher state (strict JSON):
 
 Return ONLY a valid JSON object in this format:
 {
-  "alerts": [
-    {
-      "type": "SOFT_ALERT|HARD_ALERT|REACHED|TRIGGER",
-      "entityType": "batter|bowler|team|partnership|innings|match|event|session",
-      "entity": { "id": <int>, "name": "<string>", "teamShort": "<string>" },
-      "inningsId": <int>,
-      "matchId": <int>,
-      "context": {
-        "currentValue": <number>,
-        "target": <number>,
-        "runsToTarget": <number>,
-        "ballNbr": <number>,
-        "overNumber": <number>,
-        "event": "<string>"
-      },
-      "reason": "within_window|one_away|reached|condition_met",
-      "message": "<short human-readable summary>"
-    }
-  ],
+  "alert": {
+    "type": "SOFT_ALERT|HARD_ALERT|TRIGGER|ABORTED",
+    "entityType": "batter|bowler|team|partnership|innings|match|event|session",
+    "entity": { "id": <int>, "name": "<string>", "teamShort": "<string>" },
+    "inningsId": <int>,
+    "matchId": <int>,
+    "context": {
+      "currentValue": <number>,
+      "target": <number>,
+      "runsToTarget": <number>,
+      "ballNbr": <number>,
+      "overNumber": <number>,
+      "event": "<string>"
+    },
+    "reason": "within_window|one_away|reached|condition_met|aborted",
+    "message": "<short human-readable summary>"
+  },
   "expectedNextCheck": {
     "estimatedMinutes": <number>,
     "estimatedBalls": <number>,
@@ -38,7 +36,7 @@ Return ONLY a valid JSON object in this format:
 
 If no alert is triggered, return:
 {
-  "alerts": [],
+  "alert": null,
   "expectedNextCheck": {
     "estimatedMinutes": <number>,
     "reasoning": "no milestone nearby, default polling interval"

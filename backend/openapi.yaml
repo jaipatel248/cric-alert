@@ -1,0 +1,678 @@
+openapi: 3.0.3
+info:
+  title: Crick Alert API
+  description: |
+    Cricket match monitoring and alert system with natural language alert conditions.
+    
+    Monitor live cricket matches and get alerts when specific conditions are met:
+    - Player milestones (50s, 100s, wickets)
+    - Team scores and targets
+    - Match events and conditions
+    
+    Powered by Cricbuzz live data and Google Gemini AI for natural language parsing.
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@crickalert.com
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+  - url: https://api.crickalert.com
+    description: Production server
+
+tags:
+  - name: Health
+    description: Health check and system status endpoints
+  - name: Matches
+    description: Cricket match information and status
+  - name: Alerts
+    description: Alert monitoring and management
+
+paths:
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check
+      description: Get API health status and active monitor count
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /ping:
+    get:
+      tags:
+        - Health
+      summary: Simple ping
+      description: Quick ping endpoint for connectivity check
+      operationId: ping
+      responses:
+        '200':
+          description: Pong response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: pong
+
+  /api/v1/matches/{match_id}:
+    get:
+      tags:
+        - Matches
+      summary: Get match status
+      description: Get current simplified match status including score, overs, and batting team
+      operationId: getMatchStatus
+      parameters:
+        - name: match_id
+          in: path
+          required: true
+          description: Cricbuzz match ID
+          schema:
+            type: integer
+            example: 117371
+      responses:
+        '200':
+          description: Match status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MatchStatus'
+        '404':
+          description: Match not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/matches/{match_id}/detail:
+    get:
+      tags:
+        - Matches
+      summary: Get detailed match information
+      description: Get comprehensive match details including teams, miniscore, and full match data
+      operationId: getMatchDetail
+      parameters:
+        - name: match_id
+          in: path
+          required: true
+          description: Cricbuzz match ID
+          schema:
+            type: integer
+            example: 117371
+      responses:
+        '200':
+          description: Match details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MatchDetail'
+        '404':
+          description: Match not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/matches/{match_id}/active:
+    get:
+      tags:
+        - Matches
+      summary: Check if match is active
+      description: Check whether a match is currently in progress
+      operationId: checkMatchActive
+      parameters:
+        - name: match_id
+          in: path
+          required: true
+          description: Cricbuzz match ID
+          schema:
+            type: integer
+            example: 117371
+      responses:
+        '200':
+          description: Match activity status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  match_id:
+                    type: integer
+                    example: 117371
+                  is_active:
+                    type: boolean
+                    example: true
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/alerts:
+    post:
+      tags:
+        - Alerts
+      summary: Create alert monitor
+      description: |
+        Create a new alert monitor with natural language condition.
+        
+        Examples:
+        - "Notify me when Virat Kohli scores 50 runs"
+        - "Alert when India crosses 200 runs"
+        - "Tell me when any bowler takes 5 wickets"
+      operationId: createAlert
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AlertRequest'
+            examples:
+              playerMilestone:
+                summary: Player milestone alert
+                value:
+                  match_id: 117371
+                  alert_text: "Notify me when Virat Kohli is within 5 runs of a century"
+              teamScore:
+                summary: Team score alert
+                value:
+                  match_id: 117371
+                  alert_text: "Alert when India crosses 300 runs"
+      responses:
+        '201':
+          description: Alert monitor created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertResponse'
+        '400':
+          description: Invalid request or could not parse alert rule
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Match not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    get:
+      tags:
+        - Alerts
+      summary: List all alert monitors
+      description: Get a list of all active alert monitors
+      operationId: listAlerts
+      responses:
+        '200':
+          description: List of alert monitors
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MonitorInfo'
+
+  /api/v1/alerts/{monitor_id}:
+    get:
+      tags:
+        - Alerts
+      summary: Get alert monitor details
+      description: Get detailed information about a specific alert monitor including recent alerts
+      operationId: getAlert
+      parameters:
+        - name: monitor_id
+          in: path
+          required: true
+          description: Monitor ID
+          schema:
+            type: string
+            example: "117371_1731619200000"
+      responses:
+        '200':
+          description: Monitor details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MonitorDetail'
+        '404':
+          description: Monitor not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags:
+        - Alerts
+      summary: Stop alert monitor
+      description: Stop monitoring but keep the monitor record
+      operationId: stopAlert
+      parameters:
+        - name: monitor_id
+          in: path
+          required: true
+          description: Monitor ID
+          schema:
+            type: string
+            example: "117371_1731619200000"
+      responses:
+        '200':
+          description: Monitor stopped successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  monitor_id:
+                    type: string
+                    example: "117371_1731619200000"
+                  status:
+                    type: string
+                    example: stopped
+                  message:
+                    type: string
+                    example: Monitor stopped successfully
+        '404':
+          description: Monitor not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/alerts/{monitor_id}/delete:
+    delete:
+      tags:
+        - Alerts
+      summary: Delete alert monitor
+      description: Permanently delete an alert monitor
+      operationId: deleteAlert
+      parameters:
+        - name: monitor_id
+          in: path
+          required: true
+          description: Monitor ID
+          schema:
+            type: string
+            example: "117371_1731619200000"
+      responses:
+        '200':
+          description: Monitor deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  monitor_id:
+                    type: string
+                    example: "117371_1731619200000"
+                  status:
+                    type: string
+                    example: deleted
+                  message:
+                    type: string
+                    example: Monitor deleted successfully
+        '404':
+          description: Monitor not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - timestamp
+        - active_monitors
+        - version
+      properties:
+        status:
+          type: string
+          example: healthy
+          description: Service health status
+        timestamp:
+          type: string
+          format: date-time
+          example: "2025-11-15T10:30:00"
+          description: Current server timestamp
+        active_monitors:
+          type: integer
+          example: 5
+          description: Number of currently active monitors
+        version:
+          type: string
+          example: "1.0.0"
+          description: API version
+
+    MatchStatus:
+      type: object
+      required:
+        - match_id
+        - state
+        - status
+      properties:
+        match_id:
+          type: integer
+          example: 117371
+          description: Cricbuzz match ID
+        state:
+          type: string
+          example: "In Progress"
+          description: Match state (In Progress, Complete, etc.)
+        status:
+          type: string
+          example: "Day 1: 1st Session"
+          description: Current match status description
+        score:
+          type: string
+          nullable: true
+          example: "42/0"
+          description: Current score in format runs/wickets
+        overs:
+          type: number
+          format: float
+          nullable: true
+          example: 8.4
+          description: Overs bowled
+        batting_team:
+          type: string
+          nullable: true
+          example: "RSA"
+          description: Currently batting team short name
+        current_run_rate:
+          type: number
+          format: float
+          nullable: true
+          example: 4.85
+          description: Current run rate
+
+    MatchDetail:
+      type: object
+      required:
+        - match_id
+        - description
+        - format
+        - state
+        - status
+        - teams
+      properties:
+        match_id:
+          type: integer
+          example: 117371
+          description: Cricbuzz match ID
+        description:
+          type: string
+          example: "South Africa vs India, 1st Test"
+          description: Match description
+        format:
+          type: string
+          example: "TEST"
+          description: Match format (TEST, ODI, T20, etc.)
+        state:
+          type: string
+          example: "In Progress"
+          description: Match state
+        status:
+          type: string
+          example: "Day 1: 1st Session"
+          description: Current status
+        teams:
+          type: array
+          items:
+            type: string
+          example: ["RSA", "IND"]
+          description: Team short names
+        miniscore:
+          type: object
+          nullable: true
+          description: Live miniscore data (if available)
+
+    AlertRequest:
+      type: object
+      required:
+        - match_id
+        - alert_text
+      properties:
+        match_id:
+          type: integer
+          example: 117371
+          description: Cricbuzz match ID to monitor
+        alert_text:
+          type: string
+          example: "Notify me when Virat Kohli is within 5 runs of a century"
+          description: Natural language alert condition
+
+    AlertResponse:
+      type: object
+      required:
+        - monitor_id
+        - match_id
+        - alert_text
+        - rules
+        - status
+        - message
+        - created_at
+      properties:
+        monitor_id:
+          type: string
+          example: "117371_1731619200000"
+          description: Unique monitor identifier
+        match_id:
+          type: integer
+          example: 117371
+          description: Match being monitored
+        alert_text:
+          type: string
+          example: "Notify me when Virat Kohli is within 5 runs of a century"
+          description: Original alert text
+        rules:
+          type: object
+          description: Parsed alert rules (LLM generated)
+        status:
+          type: string
+          enum:
+            - monitoring
+            - approaching
+            - imminent
+            - triggered
+            - aborted
+            - completed
+            - stopped
+            - error
+            - deleted
+          example: monitoring
+          description: Current monitor status
+        message:
+          type: string
+          example: "Monitor created successfully"
+          description: Response message
+        created_at:
+          type: string
+          format: date-time
+          example: "2025-11-15T10:30:00"
+          description: Monitor creation timestamp
+
+    MonitorInfo:
+      type: object
+      required:
+        - monitor_id
+        - match_id
+        - alert_text
+        - running
+        - status
+        - created_at
+        - alerts_count
+      properties:
+        monitor_id:
+          type: string
+          example: "117371_1731619200000"
+          description: Unique monitor identifier
+        match_id:
+          type: integer
+          example: 117371
+          description: Match being monitored
+        alert_text:
+          type: string
+          example: "Notify me when Virat Kohli is within 5 runs of a century"
+          description: Alert condition
+        running:
+          type: boolean
+          example: true
+          description: Whether monitor is currently active
+        status:
+          type: string
+          enum:
+            - monitoring
+            - approaching
+            - imminent
+            - triggered
+            - aborted
+            - completed
+            - stopped
+            - error
+            - deleted
+          example: monitoring
+          description: |
+            Monitor lifecycle status:
+            - monitoring: Active, no alerts yet
+            - approaching: Has SOFT_ALERT, approaching target
+            - imminent: Has HARD_ALERT, very close to target
+            - triggered: Target reached (TRIGGER alert)
+            - aborted: Cannot reach target (ABORTED alert)
+            - completed: Match ended
+            - stopped: Manually stopped
+            - error: Error occurred
+            - deleted: Monitor deleted
+        created_at:
+          type: string
+          format: date-time
+          example: "2025-11-15T10:30:00"
+          description: Creation timestamp
+        alerts_count:
+          type: integer
+          example: 3
+          description: Total number of alerts triggered
+        last_alert_message:
+          type: string
+          nullable: true
+          example: "Kohli 95* — 5 runs short of century"
+          description: Most recent alert message
+
+    MonitorDetail:
+      allOf:
+        - $ref: '#/components/schemas/MonitorInfo'
+        - type: object
+          required:
+            - rules
+            - recent_alerts
+          properties:
+            rules:
+              type: object
+              description: Parsed alert rules from LLM
+            recent_alerts:
+              type: array
+              items:
+                $ref: '#/components/schemas/Alert'
+              description: Last 10 triggered alerts
+
+    Alert:
+      type: object
+      required:
+        - type
+        - message
+        - timestamp
+      properties:
+        type:
+          type: string
+          enum:
+            - SOFT_ALERT
+            - HARD_ALERT
+            - TRIGGER
+            - ABORTED
+            - INFO
+          example: HARD_ALERT
+          description: |
+            Alert type:
+            - SOFT_ALERT: Approaching target (within approach window)
+            - HARD_ALERT: Very close to target (one away)
+            - TRIGGER: Target reached/condition met
+            - ABORTED: Cannot reach target anymore
+            - INFO: Informational (e.g., match ended)
+        entityType:
+          type: string
+          example: batter
+          description: Entity type (batter, bowler, team, etc.)
+        entity:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            teamShort:
+              type: string
+          description: Entity details
+        message:
+          type: string
+          example: "Kohli 99* — one away from century"
+          description: Human-readable alert message
+        context:
+          type: object
+          description: Additional context (current value, target, etc.)
+        timestamp:
+          type: string
+          format: date-time
+          example: "2025-11-15T10:35:00"
+          description: Alert timestamp
+        reason:
+          type: string
+          example: one_away
+          description: Reason for alert (within_window, one_away, reached, etc.)
+
+    ErrorResponse:
+      type: object
+      required:
+        - detail
+      properties:
+        detail:
+          type: string
+          example: "Match 117371 not found"
+          description: Error message
+        timestamp:
+          type: string
+          format: date-time
+          example: "2025-11-15T10:30:00"
+          description: Error timestamp

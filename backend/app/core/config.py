@@ -25,7 +25,12 @@ class Settings(BaseSettings):
     PROMPTS_DIR: Path = BASE_DIR / "prompts"
     
     # CORS
-    ALLOWED_ORIGINS: List[str] = ["*"]
+    ALLOWED_ORIGINS: List[str] = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8000",
+        "*"  # Allow all origins in development
+    ]
     
     # API Keys
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")

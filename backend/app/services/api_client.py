@@ -59,7 +59,7 @@ class CricbuzzAPIClient:
         return {
             "matchHeader": data.get("matchHeader", {}),
             "miniscore": data.get("miniscore", {}),
-            "commentaryList": data.get("commentaryList", []),
+            "commentaryList": [],
             "matchId": match_id,
             "timestamp": time.time(),
         }

@@ -10,6 +10,7 @@ from app.services.watcher import AlertWatcher
 from app.services.scheduler import AdaptiveScheduler
 from app.services.cricket_service import cricket_service
 from app.core.config import settings
+from app.models.enums import AlertType, MonitorStatus
 
 
 class AlertService:
@@ -46,6 +47,7 @@ class AlertService:
                 "watcher": watcher,
                 "scheduler": scheduler,
                 "running": True,
+                "status": MonitorStatus.MONITORING.value,
                 "alerts": [],
                 "created_at": datetime.now().isoformat()
             }
@@ -55,7 +57,7 @@ class AlertService:
                 "match_id": match_id,
                 "alert_text": alert_text,
                 "rules": rules,
-                "status": "active",
+                "status": MonitorStatus.MONITORING.value,
                 "message": "Monitor created successfully",
                 "created_at": self.active_monitors[monitor_id]["created_at"]
             }
@@ -70,29 +72,27 @@ class AlertService:
             return None
         
         monitor = self.active_monitors[monitor_id]
+        alerts = monitor["alerts"]
+        last_alert_message = alerts[-1].get("message") if alerts else None
+        
         return {
             "monitor_id": monitor_id,
             "match_id": monitor["match_id"],
             "alert_text": monitor["alert_text"],
             "rules": monitor["rules"],
             "running": monitor["running"],
+            "status": monitor.get("status", MonitorStatus.STOPPED.value),
             "created_at": monitor["created_at"],
-            "alerts_count": len(monitor["alerts"]),
-            "recent_alerts": monitor["alerts"][-10:]  # Last 10
+            "alerts_count": len(alerts),
+            "last_alert_message": last_alert_message,
+            "recent_alerts": alerts[-10:]  # Last 10
         }
     
     def list_monitors(self):
         """List all monitors"""
         result = []
         for monitor_id, monitor in self.active_monitors.items():
-            result.append({
-                "monitor_id": monitor_id,
-                "match_id": monitor["match_id"],
-                "alert_text": monitor["alert_text"],
-                "running": monitor["running"],
-                "created_at": monitor["created_at"],
-                "alerts_count": len(monitor["alerts"])
-            })
+            result.append(self.get_monitor(monitor_id))
         return result
     
     def stop_monitor(self, monitor_id: str) -> bool:
@@ -101,6 +101,7 @@ class AlertService:
             return False
         
         self.active_monitors[monitor_id]["running"] = False
+        self.active_monitors[monitor_id]["status"] = MonitorStatus.STOPPED.value
         return True
     
     def delete_monitor(self, monitor_id: str) -> bool:
@@ -109,6 +110,7 @@ class AlertService:
             return False
         
         self.active_monitors[monitor_id]["running"] = False
+        self.active_monitors[monitor_id]["status"] = MonitorStatus.DELETED.value
         del self.active_monitors[monitor_id]
         return True
     
@@ -142,8 +144,9 @@ class AlertService:
                 match_header = live_data.get("matchHeader", {})
                 if match_header.get("complete", False):
                     monitor["running"] = False
+                    monitor["status"] = MonitorStatus.COMPLETED.value
                     monitor["alerts"].append({
-                        "type": "INFO",
+                        "type": AlertType.INFO.value,
                         "entity_type": "match",
                         "message": "Match has ended",
                         "context": {},
@@ -154,23 +157,50 @@ class AlertService:
                 # Evaluate alerts
                 result = watcher.evaluate(monitor["rules"], live_data)
                 
-                # Store new alerts
-                if result and result.get("alerts"):
-                    for alert in result["alerts"]:
-                        alert["timestamp"] = datetime.now().isoformat()
-                        monitor["alerts"].append(alert)
-                        print(f"🚨 Alert: {alert['message']}")
+                # Store alert if triggered (single alert object from LLM)
+                if result and result.get("alert"):
+                    alert = result["alert"]
+                    alert["timestamp"] = datetime.now().isoformat()
+                    monitor["alerts"].append(alert)
+                    
+                    alert_type = alert.get('type', '')
+                    print(f"🚨 Alert [{alert_type}]: {alert.get('message', 'No message')}")
+                    
+                    # Align monitor status with alert type
+                    if alert_type == AlertType.TRIGGER.value:
+                        # Target reached - stop monitoring
+                        monitor["running"] = False
+                        monitor["status"] = MonitorStatus.TRIGGERED.value
+                        print(f"✅ Monitor {monitor_id} triggered - target reached")
+                        break
+                    elif alert_type == AlertType.ABORTED.value:
+                        # Cannot reach target anymore - stop monitoring
+                        monitor["running"] = False
+                        monitor["status"] = MonitorStatus.ABORTED.value
+                        print(f"⏹️  Monitor {monitor_id} aborted - target unreachable")
+                        break
+                    elif alert_type == AlertType.SOFT_ALERT.value:
+                        # Approaching target - continue monitoring
+                        monitor["status"] = MonitorStatus.APPROACHING.value
+                        print(f"📍 Monitor {monitor_id} approaching target")
+                    elif alert_type == AlertType.HARD_ALERT.value:
+                        # Very close to target - continue monitoring
+                        monitor["status"] = MonitorStatus.IMMINENT.value
+                        print(f"🔥 Monitor {monitor_id} imminent - very close to target")
                 
                 # Update scheduler
                 scheduler.mark_polled()
                 if result and "expectedNextCheck" in result:
                     estimated_min = result["expectedNextCheck"].get("estimatedMinutes", 1)
-                    scheduler.set_next_interval(estimated_min)
+                    scheduler.set_next_interval(min(estimated_min, 1))
                 else:
                     scheduler.set_next_interval(1)
                 
             except Exception as e:
                 print(f"❌ Error in monitor {monitor_id}: {e}")
+                # mark monitor as errored and stop
+                monitor["running"] = False
+                monitor["status"] = MonitorStatus.ERROR.value
                 await asyncio.sleep(60)
         
         print(f"⏹️  Monitor {monitor_id} stopped")
