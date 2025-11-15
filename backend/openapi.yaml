@@ -589,6 +589,31 @@ components:
           nullable: true
           example: "Kohli 95* — 5 runs short of century"
           description: Most recent alert message
+        expectedNextCheck:
+          type: object
+          nullable: true
+          description: |
+            Suggested next-check hint from the LLM. Provides estimated timing 
+            information and reasoning for when to check next based on match conditions.
+            This helps clients adjust polling frequency dynamically.
+          properties:
+            estimatedMinutes:
+              type: number
+              format: float
+              description: Estimated minutes until next meaningful check
+              example: 0.5
+            estimatedBalls:
+              type: integer
+              description: Estimated balls until condition may be met
+              example: 5
+            reasoning:
+              type: string
+              description: Explanation of how this estimate was calculated
+              example: "Batter is 5 runs away, should reach in approximately 5 balls at current strike rate"
+          example:
+            estimatedMinutes: 0.5
+            estimatedBalls: 5
+            reasoning: "Batter is 5 runs away from milestone"
 
     MonitorDetail:
       allOf:

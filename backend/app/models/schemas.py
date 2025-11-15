@@ -25,6 +25,18 @@ class AlertResponse(BaseModel):
     created_at: str
 
 
+class ExpectedNextCheck(BaseModel):
+    estimatedMinutes: Optional[float] = Field(
+        None, description="Estimated minutes until next check"
+    )
+    estimatedBalls: Optional[int] = Field(
+        None, description="Estimated balls until next check"
+    )
+    reasoning: Optional[str] = Field(
+        None, description="Explanation of how this was estimated"
+    )
+
+
 class MonitorInfo(BaseModel):
     """Information about an active monitor"""
     monitor_id: str
@@ -35,6 +47,7 @@ class MonitorInfo(BaseModel):
     created_at: str
     alerts_count: int
     last_alert_message: Optional[str] = None
+    expectedNextCheck: Optional[ExpectedNextCheck] = None
 
 
 class MonitorDetail(MonitorInfo):

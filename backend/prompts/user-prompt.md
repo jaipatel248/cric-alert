@@ -28,19 +28,7 @@ Return ONLY a valid JSON object in this format:
   "expectedNextCheck": {
     "estimatedMinutes": <number>,
     "estimatedBalls": <number>,
-    "estimatedOvers": <number>,
-    "reasoning": "<string explanation of how this was estimated>"
+    "reasoning": "<concise explanation with relevant stats>"
   },
   "state": { ...updated deduplication and snapshot data... }
 }
-
-If no alert is triggered, return:
-{
-  "alert": null,
-  "expectedNextCheck": {
-    "estimatedMinutes": <number>,
-    "reasoning": "no milestone nearby, default polling interval"
-  },
-  "state": { ...updated state... }
-}
-

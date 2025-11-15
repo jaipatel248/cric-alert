@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useCallback } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import {
   Box,
   Paper,
@@ -13,12 +13,13 @@ import {
   Stack,
   Card,
   CardContent,
-} from '@mui/material';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import RefreshIcon from '@mui/icons-material/Refresh';
-import DeleteIcon from '@mui/icons-material/Delete';
-import { alertAPI } from '../services/api';
-import { AlertMonitor, AlertType, MonitorStatus } from '../types';
+  Grid,
+} from "@mui/material";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import DeleteIcon from "@mui/icons-material/Delete";
+import { alertAPI } from "../services/api";
+import { AlertMonitor, AlertType, MonitorStatus } from "../types";
 
 const AlertDetail: React.FC = () => {
   const { monitorId } = useParams<{ monitorId: string }>();
@@ -27,81 +28,117 @@ const AlertDetail: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (monitorId) {
-      fetchMonitorDetail();
-      // Poll every 3 seconds
-      const interval = setInterval(() => {
-        fetchMonitorDetail();
-      }, 10000);
-      return () => clearInterval(interval);
-    }
-  }, [monitorId]);
-
-  const fetchMonitorDetail = async () => {
+  const fetchMonitorDetail = useCallback(async () => {
     if (!monitorId) return;
-    
+
     try {
       const data = await alertAPI.get(monitorId);
       setMonitor(data);
       setLoading(false);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to fetch monitor details');
+      setError(err.response?.data?.detail || "Failed to fetch monitor details");
       setLoading(false);
     }
-  };
+  }, [monitorId]);
 
-  const handleDelete = async () => {
-    if (!monitorId || !window.confirm('Are you sure you want to delete this monitor?')) {
+  useEffect(() => {
+    if (monitorId) {
+      fetchMonitorDetail();
+      // Poll every 10 seconds
+      const interval = setInterval(() => {
+        fetchMonitorDetail();
+      }, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [monitorId, fetchMonitorDetail]);
+
+  const handleDelete = useCallback(async () => {
+    if (
+      !monitorId ||
+      !window.confirm("Are you sure you want to delete this monitor?")
+    ) {
       return;
     }
 
     try {
       await alertAPI.delete(monitorId);
-      navigate('/alerts');
+      navigate("/alerts");
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to delete monitor');
+      setError(err.response?.data?.detail || "Failed to delete monitor");
     }
-  };
+  }, [monitorId, navigate]);
 
-  const getStatusColor = (status?: MonitorStatus) => {
+  const getStatusColor = useCallback((status?: MonitorStatus) => {
     switch (status) {
-      case 'monitoring': return 'info';
-      case 'approaching': return 'warning';
-      case 'imminent': return 'warning';
-      case 'triggered': return 'success';
-      case 'aborted': return 'error';
-      case 'completed': return 'default';
-      case 'stopped': return 'default';
-      case 'error': return 'error';
-      case 'deleted': return 'default';
-      default: return 'default';
+      case "monitoring":
+        return "info";
+      case "approaching":
+        return "warning";
+      case "imminent":
+        return "warning";
+      case "triggered":
+        return "success";
+      case "aborted":
+        return "error";
+      case "completed":
+        return "default";
+      case "stopped":
+        return "default";
+      case "error":
+        return "error";
+      case "deleted":
+        return "default";
+      default:
+        return "default";
     }
-  };
+  }, []);
 
-  const getAlertTypeColor = (type: AlertType): 'warning' | 'error' | 'success' | 'info' => {
+  const getAlertTypeColor = useCallback(
+    (type: AlertType): "warning" | "error" | "success" | "info" => {
+      switch (type) {
+        case "SOFT_ALERT":
+          return "info";
+        case "HARD_ALERT":
+          return "warning";
+        case "TRIGGER":
+          return "success";
+        case "ABORTED":
+          return "error";
+        case "INFO":
+          return "info";
+      }
+    },
+    []
+  );
+
+  const getAlertTypeLabel = useCallback((type: AlertType): string => {
     switch (type) {
-      case 'SOFT_ALERT': return 'info';
-      case 'HARD_ALERT': return 'warning';
-      case 'TRIGGER': return 'success';
-      case 'ABORTED': return 'error';
-      case 'INFO': return 'info';
+      case "SOFT_ALERT":
+        return "Approaching";
+      case "HARD_ALERT":
+        return "Imminent";
+      case "TRIGGER":
+        return "Triggered";
+      case "ABORTED":
+        return "Aborted";
+      case "INFO":
+        return "Info";
     }
-  };
+  }, []);
 
-  const getAlertTypeLabel = (type: AlertType): string => {
-    switch (type) {
-      case 'SOFT_ALERT': return 'Approaching';
-      case 'HARD_ALERT': return 'Imminent';
-      case 'TRIGGER': return 'Triggered';
-      case 'ABORTED': return 'Aborted';
-      case 'INFO': return 'Info';
-    }
+  const ballsToOvers = (estimatedBalls: number) => {
+    const overs = Math.floor(estimatedBalls / 6); // full overs
+    const balls = estimatedBalls % 6; // leftover balls
+    return `${overs}.${balls}`;
   };
-
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="50vh">
+      <Box
+        display='flex'
+        justifyContent='center'
+        alignItems='center'
+        minHeight='50vh'
+      >
         <CircularProgress />
       </Box>
     );
@@ -110,17 +147,22 @@ const AlertDetail: React.FC = () => {
   if (error || !monitor) {
     return (
       <Box>
-        <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/alerts')} sx={{ mb: 2 }}>
+        <Button
+          startIcon={<ArrowBackIcon />}
+          onClick={() => navigate("/alerts")}
+          sx={{ mb: 2 }}
+        >
           Back to Alerts
         </Button>
-        <Alert severity="error">{error || 'Monitor not found'}</Alert>
+        <Alert severity='error'>{error || "Monitor not found"}</Alert>
       </Box>
     );
   }
 
-  const isRunning = monitor.status === 'monitoring' || 
-                    monitor.status === 'approaching' || 
-                    monitor.status === 'imminent';
+  const isRunning =
+    monitor.status === "monitoring" ||
+    monitor.status === "approaching" ||
+    monitor.status === "imminent";
 
   return (
     <Box>
@@ -174,64 +216,172 @@ const AlertDetail: React.FC = () => {
             />
           </Box>
           <Divider />
-          <Box>
-            <Typography variant='body2' color='text.secondary'>
-              Alert Condition
-            </Typography>
-            <Typography variant='body1' fontWeight='medium'>
-              {monitor.alert_text}
-            </Typography>
-          </Box>
-          <Box>
-            <Typography variant='body2' color='text.secondary'>
-              Match ID
-            </Typography>
-            <Typography variant='body1' fontWeight='medium'>
-              {monitor.match_id}
-            </Typography>
-          </Box>
-          <Box>
-            <Typography variant='body2' color='text.secondary'>
-              Monitor ID
-            </Typography>
-            <Typography
-              variant='body1'
-              fontWeight='medium'
-              sx={{ fontFamily: "monospace", fontSize: "0.9rem" }}
-            >
-              {monitor.monitor_id}
-            </Typography>
-          </Box>
-          <Box>
-            <Typography variant='body2' color='text.secondary'>
-              Created
-            </Typography>
-            <Typography variant='body1'>
-              {new Date(monitor.created_at).toLocaleString()}
-            </Typography>
-          </Box>
-          <Box>
-            <Typography variant='body2' color='text.secondary'>
-              Status
-            </Typography>
-            <Typography variant='body1'>
-              {isRunning ? "🟢 Running" : "🔴 Stopped"} ·{" "}
-              {monitor.alerts_count || 0} alerts triggered
-            </Typography>
-          </Box>
-          {monitor.last_alert_message && (
-            <Box>
+
+          {/* Grid layout for monitor info */}
+          <Grid container spacing={2}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <Typography variant='body2' color='text.secondary'>
-                Latest Alert
+                Alert Condition
+              </Typography>
+              <Typography variant='body1' fontWeight='medium'>
+                {monitor.alert_text}
+              </Typography>
+            </Grid>
+            <Grid size={{ xs: 12, md: 6 }}>
+              <Typography variant='body2' color='text.secondary'>
+                Status
+              </Typography>
+              <Typography variant='body1'>
+                {isRunning ? "🟢 Running" : "🔴 Stopped"} ·{" "}
+                {monitor.alerts_count || 0} alerts triggered
+              </Typography>
+            </Grid>
+            <Grid size={{ xs: 12, md: 6 }}>
+              <Typography variant='body2' color='text.secondary'>
+                Match ID
+              </Typography>
+              <Typography variant='body1' fontWeight='medium'>
+                {monitor.match_id}
+              </Typography>
+            </Grid>
+            <Grid size={{ xs: 12, md: 6 }}>
+              <Typography variant='body2' color='text.secondary'>
+                Created
+              </Typography>
+              <Typography variant='body1'>
+                {new Date(monitor.created_at).toLocaleString()}
+              </Typography>
+            </Grid>
+            <Grid size={{ xs: 12 }}>
+              <Typography variant='body2' color='text.secondary'>
+                Monitor ID
               </Typography>
               <Typography
                 variant='body1'
-                fontStyle='italic'
-                color='success.main'
+                fontWeight='medium'
+                sx={{ fontFamily: "monospace", fontSize: "0.9rem" }}
               >
-                {monitor.last_alert_message}
+                {monitor.monitor_id}
               </Typography>
-            </Box>
+            </Grid>
+          </Grid>
+
+          {/* Next Check Estimation */}
+          {monitor.expectedNextCheck && (
+            <>
+              <Divider />
+              <Box>
+                <Typography
+                  variant='body2'
+                  color='text.secondary'
+                  gutterBottom
+                  sx={{ mb: 1.5 }}
+                >
+                  Next Check Estimation
+                </Typography>
+                <Box
+                  sx={{
+                    p: 2,
+                    bgcolor: "info.lighter",
+                    borderRadius: 1,
+                    border: "1px solid",
+                    borderColor: "info.light",
+                  }}
+                >
+                  <Grid container spacing={2}>
+                    {monitor.expectedNextCheck.estimatedMinutes !==
+                      undefined && (
+                      <Grid size={{ xs: 12, sm: 6 }}>
+                        <Box
+                          display='flex'
+                          alignItems='center'
+                          gap={1}
+                          sx={{
+                            p: 1,
+                            bgcolor: "background.paper",
+                            borderRadius: 1,
+                          }}
+                        >
+                          <Typography
+                            variant='body2'
+                            color='text.secondary'
+                            sx={{ minWidth: "fit-content" }}
+                          >
+                            ⏱️ Time:
+                          </Typography>
+                          <Typography variant='body2' fontWeight='medium'>
+                            ~
+                            {Math.round(
+                              monitor.expectedNextCheck.estimatedMinutes * 60
+                            )}
+                            s (
+                            {monitor.expectedNextCheck.estimatedMinutes.toFixed(
+                              1
+                            )}{" "}
+                            min)
+                          </Typography>
+                        </Box>
+                      </Grid>
+                    )}
+                    {monitor.expectedNextCheck.estimatedBalls !== undefined && (
+                      <Grid size={{ xs: 12, sm: 6 }}>
+                        <Box
+                          display='flex'
+                          alignItems='center'
+                          gap={1}
+                          sx={{
+                            p: 1,
+                            bgcolor: "background.paper",
+                            borderRadius: 1,
+                          }}
+                        >
+                          <Typography
+                            variant='body2'
+                            color='text.secondary'
+                            sx={{ minWidth: "fit-content" }}
+                          >
+                            📊 Overs:
+                          </Typography>
+                          <Typography variant='body2' fontWeight='medium'>
+                            ~
+                            {ballsToOvers(
+                              monitor.expectedNextCheck.estimatedBalls
+                            )}{" "}
+                            overs
+                          </Typography>
+                        </Box>
+                      </Grid>
+                    )}
+                    {monitor.expectedNextCheck.reasoning && (
+                      <Grid size={{ xs: 12 }}>
+                        <Box
+                          sx={{
+                            p: 1.5,
+                            bgcolor: "background.paper",
+                            borderRadius: 1,
+                          }}
+                        >
+                          <Typography
+                            variant='caption'
+                            color='text.secondary'
+                            display='block'
+                            gutterBottom
+                          >
+                            💡 Reasoning:
+                          </Typography>
+                          <Typography
+                            variant='body2'
+                            sx={{ fontStyle: "italic" }}
+                          >
+                            {monitor.expectedNextCheck.reasoning}
+                          </Typography>
+                        </Box>
+                      </Grid>
+                    )}
+                  </Grid>
+                </Box>
+              </Box>
+            </>
           )}
         </Stack>
       </Paper>

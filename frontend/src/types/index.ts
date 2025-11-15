@@ -102,6 +102,11 @@ export interface CreateAlertRequest {
   match_id: number;
   alert_text: string;
 }
+export interface ExpectedNextCheck {
+  estimatedMinutes: number;
+  estimatedBalls: number;
+  reasoning: string;
+}
 
 export interface AlertMonitor {
   monitor_id: string;
@@ -115,6 +120,7 @@ export interface AlertMonitor {
   rules?: any;
   alerts_count?: number;
   last_alert_message?: string;
+  expectedNextCheck?: ExpectedNextCheck;
   recent_alerts?: Array<{
     type: AlertType;
     entityType?: string;
