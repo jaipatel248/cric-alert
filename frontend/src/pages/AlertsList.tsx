@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatDateTime } from '../utils/dateFormatter';
+import { capitalize } from "lodash";
 import {
   Box,
   Typography,
@@ -76,7 +77,7 @@ const AlertsList: React.FC = () => {
       case "monitoring":
         return "info";
       case "approaching":
-        return "warning";
+        return "info"; 
       case "imminent":
         return "warning";
       case "triggered":
@@ -84,7 +85,7 @@ const AlertsList: React.FC = () => {
       case "aborted":
         return "error";
       case "completed":
-        return "default";
+        return "success"; 
       case "stopped":
         return "default";
       case "error":
@@ -197,7 +198,7 @@ const AlertsList: React.FC = () => {
                   </TableCell>
                   <TableCell>
                     <Chip
-                      label={alert.status || "unknown"}
+                      label={capitalize(alert.status || "unknown")}
                       color={getStatusColor(alert.status)}
                       size='small'
                     />

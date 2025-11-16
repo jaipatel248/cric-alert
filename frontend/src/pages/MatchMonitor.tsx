@@ -53,39 +53,39 @@ const MatchMonitor: React.FC = () => {
 
   const createAlert = async () => {
     if (!matchId || !alertText) {
-      setError('Please enter both match ID and alert text');
+      setError("Please enter both match ID and alert text");
       return;
     }
 
     setAlertLoading(true);
     setError(null);
     setSuccess(null);
-    
+
     try {
       const response = await alertAPI.create({
         match_id: parseInt(matchId),
         alert_text: alertText,
       });
-      
-      setSuccess(`Alert created successfully! Monitor ID: ${response.monitor_id}`);
-      setAlertText('');
-      
-      // Redirect to alerts list after 2 seconds
-      setTimeout(() => {
-        navigate('/alerts');
-      }, 2000);
+
+      setSuccess(
+        `Alert created successfully! Monitor ID: ${response.monitor_id}`
+      );
+      setAlertText("");
+
+      // Redirect to alert details page
+      navigate("/alerts" + `/${response.monitor_id}`);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to create alert');
+      setError(err.response?.data?.detail || "Failed to create alert");
     } finally {
       setAlertLoading(false);
     }
   };
 
   const exampleAlerts = [
-    'Notify me when any player scores 50 runs',
-    'Alert when the team crosses 200 runs',
-    'Tell me when a bowler takes 5 wickets',
-    'Alert on every wicket',
+    "Notify me when any player scores 50 runs",
+    "Alert when the team crosses 200 runs",
+    "Tell me when a bowler takes 5 wickets",
+    "Alert on every wicket",
   ];
 
   return (
@@ -105,6 +105,7 @@ const MatchMonitor: React.FC = () => {
             label='Match ID'
             placeholder='e.g., 119888'
             value={matchId}
+            disabled={loading}
             onChange={(e) => setMatchId(e.target.value)}
             onKeyPress={(e) => e.key === "Enter" && fetchMatchStatus()}
           />
@@ -208,6 +209,7 @@ const MatchMonitor: React.FC = () => {
         <TextField
           fullWidth
           multiline
+          disabled={loading}
           rows={3}
           label='Alert Description'
           placeholder='e.g., Notify me when Virat Kohli is within 5 runs of a century'

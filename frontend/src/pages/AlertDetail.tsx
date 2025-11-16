@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { formatDateTime, formatTime } from '../utils/dateFormatter';
+import { capitalize } from "lodash";
 import {
   Box,
   Paper,
@@ -78,7 +79,7 @@ const AlertDetail: React.FC = () => {
       case "monitoring":
         return "info";
       case "approaching":
-        return "warning";
+        return "info"; 
       case "imminent":
         return "warning";
       case "triggered":
@@ -86,7 +87,7 @@ const AlertDetail: React.FC = () => {
       case "aborted":
         return "error";
       case "completed":
-        return "default";
+        return "success";
       case "stopped":
         return "default";
       case "error":
@@ -119,13 +120,13 @@ const AlertDetail: React.FC = () => {
   const getAlertTypeLabel = useCallback((type: AlertType): string => {
     switch (type) {
       case "SOFT_ALERT":
-        return "Approaching";
+        return "Approaching"; 
       case "HARD_ALERT":
-        return "Imminent";
+        return "Imminent"; 
       case "TRIGGER":
-        return "Triggered";
+        return "Triggered"; 
       case "ABORTED":
-        return "Aborted";
+        return "Aborted"; 
       case "INFO":
         return "Info";
     }
@@ -215,7 +216,7 @@ const AlertDetail: React.FC = () => {
           >
             <Typography variant='h6'>Monitor Information</Typography>
             <Chip
-              label={monitor.status || "unknown"}
+              label={capitalize(monitor.status || "unknown")}
               color={getStatusColor(monitor.status)}
               size='medium'
             />
