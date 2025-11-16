@@ -74,6 +74,28 @@ const AlertDetail: React.FC = () => {
     }
   }, [monitorId, navigate]);
 
+  const handleStop = useCallback(async () => {
+    if (!monitorId) return;
+
+    try {
+      await alertAPI.stop(monitorId);
+      fetchMonitorDetail();
+    } catch (err: any) {
+      setError(err.response?.data?.detail || "Failed to stop monitor");
+    }
+  }, [monitorId, fetchMonitorDetail]);
+
+  const handleStart = useCallback(async () => {
+    if (!monitorId) return;
+
+    try {
+      await alertAPI.start(monitorId);
+      fetchMonitorDetail();
+    } catch (err: any) {
+      setError(err.response?.data?.detail || "Failed to start monitor");
+    }
+  }, [monitorId, fetchMonitorDetail]);
+
   const getStatusColor = useCallback((status?: MonitorStatus) => {
     switch (status) {
       case "monitoring":
@@ -167,6 +189,7 @@ const AlertDetail: React.FC = () => {
 
   const isRunning =
     monitor.status === "monitoring" ||
+    monitor.status === "initializing" ||
     monitor.status === "approaching" ||
     monitor.status === "imminent";
 
@@ -193,15 +216,31 @@ const AlertDetail: React.FC = () => {
             startIcon={!isMobile ? <RefreshIcon /> : undefined}
             onClick={fetchMonitorDetail}
           >
-            {isMobile ? <RefreshIcon /> : 'Refresh'}
+            {isMobile ? <RefreshIcon /> : "Refresh"}
           </Button>
+          {isRunning ? (
+            <Button variant='outlined' color='warning' onClick={handleStop}>
+              Stop
+            </Button>
+          ) : (
+            <Button
+              variant='outlined'
+              color='success'
+              onClick={handleStart}
+              disabled={
+                monitor.status === "initializing" || monitor.status === "error"
+              }
+            >
+              Start
+            </Button>
+          )}
           <Button
             variant='outlined'
             color='error'
             startIcon={!isMobile ? <DeleteIcon /> : undefined}
             onClick={handleDelete}
           >
-            {isMobile ? <DeleteIcon /> : 'Delete'}
+            {isMobile ? <DeleteIcon /> : "Delete"}
           </Button>
         </Box>
       </Box>

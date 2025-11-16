@@ -74,8 +74,10 @@ Return ONLY the JSON, no explanation."""
 
         try:
             response = self.model.generate_content(prompt)
+
             text = response.text.strip()
             print(f"Debug: Received response text: {text}")
+            print(f"Debug: usage metadata: {response.usage_metadata}")
 
             # Clean up markdown code blocks if present
             if text.startswith("```"):
@@ -130,6 +132,7 @@ Return ONLY the JSON, no explanation."""
             response = self.model.generate_content(full_prompt)
             text = response.text.strip()
             print(f"Debug: Evaluation response text: {text}")
+            print(f"Debug: usage metadata: {response.usage_metadata}")
 
             # Clean up markdown code blocks if present
             if text.startswith("```"):

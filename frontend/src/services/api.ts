@@ -32,22 +32,38 @@ export const matchAPI = {
 
 export const alertAPI = {
   create: async (data: CreateAlertRequest): Promise<AlertResponse> => {
-    const response = await api.post<AlertResponse>('/api/v1/alerts', data);
+    const response = await api.post<AlertResponse>("/api/v1/alerts", data);
     return response.data;
   },
-  
+
   list: async (): Promise<AlertMonitor[]> => {
-    const response = await api.get<AlertMonitor[]>('/api/v1/alerts');
+    const response = await api.get<AlertMonitor[]>("/api/v1/alerts");
     return response.data;
   },
-  
+
   get: async (monitorId: string): Promise<AlertMonitor> => {
     const response = await api.get<AlertMonitor>(`/api/v1/alerts/${monitorId}`);
     return response.data;
   },
-  
+
   delete: async (monitorId: string): Promise<{ message: string }> => {
-    const response = await api.delete<{ message: string }>(`/api/v1/alerts/${monitorId}`);
+    const response = await api.delete<{ message: string }>(
+      `/api/v1/alerts/${monitorId}/delete`
+    );
+    return response.data;
+  },
+  
+  stop: async (monitorId: string): Promise<{ message: string }> => {
+    const response = await api.put<{ message: string }>(
+      `/api/v1/alerts/${monitorId}/stop`
+    );
+    return response.data;
+  },
+  
+  start: async (monitorId: string): Promise<{ message: string }> => {
+    const response = await api.put<{ message: string }>(
+      `/api/v1/alerts/${monitorId}/start`
+    );
     return response.data;
   },
 };

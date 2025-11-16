@@ -15,6 +15,7 @@ class AlertType(str, Enum):
 
 class MonitorStatus(str, Enum):
     """Monitor lifecycle status"""
+    INITIALIZING = "initializing"  # Monitor created, rule parsing in progress
     MONITORING = "monitoring"     # Active, no alerts yet
     APPROACHING = "approaching"   # Has SOFT_ALERT, still monitoring
     IMMINENT = "imminent"        # Has HARD_ALERT, very close to target

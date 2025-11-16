@@ -9,6 +9,7 @@ export type AlertType = 'SOFT_ALERT' | 'HARD_ALERT' | 'TRIGGER' | 'ABORTED' | 'I
 
 // Monitor lifecycle status
 export type MonitorStatus = 
+  | 'initializing'  // Monitor being initialized, rule parsing in progress
   | 'monitoring'    // Active, no alerts yet
   | 'approaching'   // Has SOFT_ALERT, still monitoring
   | 'imminent'      // Has HARD_ALERT, very close to target

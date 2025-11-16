@@ -271,7 +271,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
-    delete:
+  /api/v1/alerts/{monitor_id}/stop:
+    put:
       tags:
         - Alerts
       summary: Stop alert monitor
@@ -304,6 +305,45 @@ paths:
                     example: Monitor stopped successfully
         '404':
           description: Monitor not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/alerts/{monitor_id}/start:
+    put:
+      tags:
+        - Alerts
+      summary: Start alert monitor
+      description: Start a stopped or errored alert monitor and resume monitoring
+      operationId: startAlert
+      parameters:
+        - name: monitor_id
+          in: path
+          required: true
+          description: Monitor ID
+          schema:
+            type: string
+            example: "117371_1731619200000"
+      responses:
+        '200':
+          description: Monitor started successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  monitor_id:
+                    type: string
+                    example: "117371_1731619200000"
+                  status:
+                    type: string
+                    example: monitoring
+                  message:
+                    type: string
+                    example: Monitor started successfully
+        '400':
+          description: Monitor not found or cannot be started
           content:
             application/json:
               schema:
@@ -503,6 +543,7 @@ components:
         status:
           type: string
           enum:
+            - initializing
             - monitoring
             - approaching
             - imminent
@@ -554,6 +595,7 @@ components:
         status:
           type: string
           enum:
+            - initializing
             - monitoring
             - approaching
             - imminent
@@ -566,6 +608,7 @@ components:
           example: monitoring
           description: |
             Monitor lifecycle status:
+            - initializing: Monitor created, rule parsing in progress
             - monitoring: Active, no alerts yet
             - approaching: Has SOFT_ALERT, approaching target
             - imminent: Has HARD_ALERT, very close to target

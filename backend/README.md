@@ -24,7 +24,8 @@ backend/
 │   │   ├── cricket_service.py   # Cricket data service
 │   │   ├── alert_service.py     # Alert monitoring service
 │   │   ├── watcher.py           # Alert watcher engine
-│   │   └── scheduler.py         # Adaptive scheduler
+│   │   ├── scheduler.py         # Adaptive scheduler
+│   │   └── storage.py           # File-based storage (temporary)
 │   └── utils/                   # Utility functions
 ├── prompts/                     # AI prompts
 │   ├── system-prompt.md
@@ -144,3 +145,19 @@ Edit `app/core/config.py` to customize:
 - CORS settings
 - Polling intervals
 - Debug mode
+
+## Data Persistence
+
+The app uses a simple **file-based storage system** for temporary data persistence. See [STORAGE.md](STORAGE.md) for details.
+
+**Key points:**
+- Data is stored in `backend/data/` (auto-created, git-ignored)
+- Monitors and alerts persist across server restarts
+- This is temporary - will be replaced with a proper database later
+- Thread-safe with atomic writes
+
+To clear all data:
+```bash
+rm -rf backend/data/
+```
+

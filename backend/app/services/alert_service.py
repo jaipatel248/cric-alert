@@ -9,6 +9,7 @@ from app.services.gemini_client import GeminiClient
 from app.services.watcher import AlertWatcher
 from app.services.scheduler import AdaptiveScheduler
 from app.services.cricket_service import cricket_service
+from app.services.storage import file_storage
 from app.core.config import settings
 from app.models.enums import AlertType, MonitorStatus
 
@@ -19,53 +20,141 @@ class AlertService:
     def __init__(self):
         self.active_monitors: Dict[str, dict] = {}
         self.gemini_client = GeminiClient()
+        self._restore_monitors()
 
-    def create_monitor(self, match_id: int, alert_text: str) -> Optional[Dict]:
-        """Create a new alert monitor"""
+    def _restore_monitors(self):
+        """Restore monitors from file storage on startup"""
         try:
+            stored_monitors = file_storage.get_all_monitors()
+            for monitor_id, monitor_data in stored_monitors.items():
+                # Recreate watcher and scheduler
+                watcher = AlertWatcher(
+                    system_prompt_path=str(settings.PROMPTS_DIR / "system-prompt.md"),
+                    user_prompt_path=str(settings.PROMPTS_DIR / "user-prompt.md"),
+                )
+                scheduler = AdaptiveScheduler()
+
+                # Load alerts from storage
+                alerts = file_storage.get_alerts(monitor_id)
+
+                # Restore monitor in memory
+                # Preserve running state for monitors that were actively monitoring
+                was_running = monitor_data.get("running", False)
+                should_restart = was_running and monitor_data.get("status") in [
+                    MonitorStatus.MONITORING.value,
+                    MonitorStatus.APPROACHING.value,
+                    MonitorStatus.IMMINENT.value,
+                ]
+
+                self.active_monitors[monitor_id] = {
+                    **monitor_data,
+                    "watcher": watcher,
+                    "scheduler": scheduler,
+                    "alerts": alerts,
+                    "running": False,  # Will be set to True when restarted
+                    "should_restart": should_restart,
+                }
+
+                status = "(will restart)" if should_restart else "(stopped)"
+                print(f"📥 Restored monitor {monitor_id} {status}")
+        except Exception as e:
+            print(f"⚠️  Error restoring monitors: {e}")
+
+    def get_monitors_to_restart(self) -> list:
+        """Get list of monitor IDs that should be restarted"""
+        return [
+            monitor_id
+            for monitor_id, monitor in self.active_monitors.items()
+            if monitor.get("should_restart", False)
+        ]
+
+    def create_monitor(self, match_id: int, alert_text: str) -> Dict:
+        """Create a new alert monitor in initializing state"""
+        # Create monitor ID
+        monitor_id = f"{match_id}_{int(datetime.now().timestamp() * 1000)}"
+
+        # Initialize components
+        watcher = AlertWatcher(
+            system_prompt_path=str(settings.PROMPTS_DIR / "system-prompt.md"),
+            user_prompt_path=str(settings.PROMPTS_DIR / "user-prompt.md"),
+        )
+        scheduler = AdaptiveScheduler()
+
+        # Store monitor with initializing status (rules will be parsed in background)
+        self.active_monitors[monitor_id] = {
+            "match_id": match_id,
+            "alert_text": alert_text,
+            "rules": None,
+            "watcher": watcher,
+            "scheduler": scheduler,
+            "running": False,
+            "status": MonitorStatus.INITIALIZING.value,
+            "alerts": [],
+            "expectedNextCheck": None,
+            "created_at": datetime.now().isoformat(),
+        }
+
+        # Persist to file storage
+        file_storage.save_monitor(monitor_id, self.active_monitors[monitor_id])
+
+        return {
+            "monitor_id": monitor_id,
+            "match_id": match_id,
+            "alert_text": alert_text,
+            "rules": None,
+            "status": MonitorStatus.INITIALIZING.value,
+            "message": "Monitor is being initialized, rule parsing in progress",
+            "created_at": self.active_monitors[monitor_id]["created_at"],
+        }
+
+    def parse_rules_and_start_monitoring(self, monitor_id: str):
+        """Parse alert rules and start monitoring (runs in background thread)"""
+        if monitor_id not in self.active_monitors:
+            return
+
+        monitor = self.active_monitors[monitor_id]
+
+        try:
+            print(f"🔄 Parsing alert rule for {monitor_id}...")
+
             # Parse alert rule
-            rules = self.gemini_client.parse_alert_rule(alert_text)
+            rules = self.gemini_client.parse_alert_rule(monitor["alert_text"])
 
             if not rules:
-                return None
+                # Failed to parse
+                monitor["status"] = MonitorStatus.ERROR.value
+                monitor["running"] = False
+                file_storage.save_monitor(monitor_id, monitor)
 
-            # Create monitor ID
-            monitor_id = f"{match_id}_{int(datetime.now().timestamp() * 1000)}"
+                error_alert = {
+                    "type": AlertType.INFO.value,
+                    "entity_type": "system",
+                    "message": "Could not parse alert rule. Please rephrase your alert.",
+                    "context": {},
+                    "timestamp": datetime.now().isoformat(),
+                }
+                monitor["alerts"].append(error_alert)
+                file_storage.save_alert(monitor_id, error_alert)
 
-            # Initialize components
-            watcher = AlertWatcher(
-                system_prompt_path=str(settings.PROMPTS_DIR / "system-prompt.md"),
-                user_prompt_path=str(settings.PROMPTS_DIR / "user-prompt.md")
-            )
-            scheduler = AdaptiveScheduler()
+                print(f"❌ Failed to parse rule for {monitor_id}")
+                return
 
-            # Store monitor
-            self.active_monitors[monitor_id] = {
-                "match_id": match_id,
-                "alert_text": alert_text,
-                "rules": rules,
-                "watcher": watcher,
-                "scheduler": scheduler,
-                "running": True,
-                "status": MonitorStatus.MONITORING.value,
-                "alerts": [],
-                "expectedNextCheck": None,
-                "created_at": datetime.now().isoformat(),
-            }
+            # Update monitor with parsed rules
+            monitor["rules"] = rules
+            monitor["status"] = MonitorStatus.MONITORING.value
+            monitor["running"] = True
+            file_storage.save_monitor(monitor_id, monitor)
 
-            return {
-                "monitor_id": monitor_id,
-                "match_id": match_id,
-                "alert_text": alert_text,
-                "rules": rules,
-                "status": MonitorStatus.MONITORING.value,
-                "message": "Monitor created successfully",
-                "created_at": self.active_monitors[monitor_id]["created_at"]
-            }
+            print(f"✅ Successfully parsed rule for {monitor_id}")
+
+            # Start monitoring (run async function in new event loop)
+            asyncio.run(self.monitor_match(monitor_id))
 
         except Exception as e:
-            print(f"Error creating monitor: {e}")
-            return None
+            print(f"❌ Error initializing monitor {monitor_id}: {e}")
+            monitor["status"] = MonitorStatus.ERROR.value
+            monitor["running"] = False
+            file_storage.save_monitor(monitor_id, monitor)
 
     def get_monitor(self, monitor_id: str) -> Optional[Dict]:
         """Get monitor information"""
@@ -104,6 +193,36 @@ class AlertService:
 
         self.active_monitors[monitor_id]["running"] = False
         self.active_monitors[monitor_id]["status"] = MonitorStatus.STOPPED.value
+
+        # Persist to file storage
+        file_storage.save_monitor(monitor_id, self.active_monitors[monitor_id])
+
+        return True
+
+    def start_monitor(self, monitor_id: str) -> bool:
+        """Start a stopped monitor"""
+        if monitor_id not in self.active_monitors:
+            return False
+
+        monitor = self.active_monitors[monitor_id]
+
+        # Only allow starting if monitor is stopped or error
+        if monitor["status"] not in [
+            MonitorStatus.STOPPED.value,
+            MonitorStatus.ERROR.value,
+        ]:
+            return False
+
+        # Check if monitor has rules parsed
+        if not monitor.get("rules"):
+            return False
+
+        monitor["running"] = True
+        monitor["status"] = MonitorStatus.MONITORING.value
+
+        # Persist to file storage
+        file_storage.save_monitor(monitor_id, monitor)
+
         return True
 
     def delete_monitor(self, monitor_id: str) -> bool:
@@ -113,6 +232,11 @@ class AlertService:
 
         self.active_monitors[monitor_id]["running"] = False
         self.active_monitors[monitor_id]["status"] = MonitorStatus.DELETED.value
+
+        # Delete from file storage
+        file_storage.delete_monitor(monitor_id)
+        file_storage.delete_alerts(monitor_id)
+
         del self.active_monitors[monitor_id]
         return True
 
@@ -147,13 +271,19 @@ class AlertService:
                 if match_header.get("complete", False):
                     monitor["running"] = False
                     monitor["status"] = MonitorStatus.COMPLETED.value
-                    monitor["alerts"].append({
+
+                    end_alert = {
                         "type": AlertType.INFO.value,
                         "entity_type": "match",
                         "message": "Match has ended",
                         "context": {},
-                        "timestamp": datetime.now().isoformat()
-                    })
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                    monitor["alerts"].append(end_alert)
+
+                    # Persist to file storage
+                    file_storage.save_alert(monitor_id, end_alert)
+                    file_storage.save_monitor(monitor_id, monitor)
                     break
 
                 # Evaluate alerts
@@ -165,11 +295,17 @@ class AlertService:
                     if "expectedNextCheck" in result:
                         # prefer the structure returned by the LLM
                         monitor["expectedNextCheck"] = result["expectedNextCheck"] or {}
+                        # Persist updated expectedNextCheck
+                        file_storage.save_monitor(monitor_id, monitor)
                     if result.get("alert"):
                         alert = result["alert"]
                         # attach timestamp
                         alert["timestamp"] = datetime.now().isoformat()
                         monitor["alerts"].append(alert)
+
+                        # Persist alert to file storage
+                        file_storage.save_alert(monitor_id, alert)
+
                         alert_type = alert.get("type", "")
                         print(
                             f"🚨 Alert [{alert_type}]: {alert.get('message', 'No message')}"
@@ -180,12 +316,14 @@ class AlertService:
                             # Target reached - stop monitoring
                             monitor["running"] = False
                             monitor["status"] = MonitorStatus.TRIGGERED.value
+                            file_storage.save_monitor(monitor_id, monitor)
                             print(f"✅ Monitor {monitor_id} triggered - target reached")
                             break
                         elif alert_type == AlertType.ABORTED.value:
                             # Cannot reach target anymore - stop monitoring
                             monitor["running"] = False
                             monitor["status"] = MonitorStatus.ABORTED.value
+                            file_storage.save_monitor(monitor_id, monitor)
                             print(
                                 f"⏹️  Monitor {monitor_id} aborted - target unreachable"
                             )
@@ -193,10 +331,12 @@ class AlertService:
                         elif alert_type == AlertType.SOFT_ALERT.value:
                             # Approaching target - continue monitoring
                             monitor["status"] = MonitorStatus.APPROACHING.value
+                            file_storage.save_monitor(monitor_id, monitor)
                             print(f"📍 Monitor {monitor_id} approaching target")
                         elif alert_type == AlertType.HARD_ALERT.value:
                             # Very close to target - continue monitoring
                             monitor["status"] = MonitorStatus.IMMINENT.value
+                            file_storage.save_monitor(monitor_id, monitor)
                             print(
                                 f"🔥 Monitor {monitor_id} imminent - very close to target"
                             )
@@ -214,6 +354,7 @@ class AlertService:
                 # mark monitor as errored and stop
                 monitor["running"] = False
                 monitor["status"] = MonitorStatus.ERROR.value
+                file_storage.save_monitor(monitor_id, monitor)
                 await asyncio.sleep(60)
 
         print(f"⏹️  Monitor {monitor_id} stopped")

@@ -3,8 +3,10 @@ Main FastAPI application entry point
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import asyncio
 from app.core.config import settings
 from app.api.routes import alerts, matches, health
+from app.services.alert_service import alert_service
 
 # Create FastAPI app
 app = FastAPI(
@@ -35,6 +37,18 @@ async def startup_event():
     print(f"🚀 {settings.APP_NAME} started!")
     print(f"📡 API running on {settings.HOST}:{settings.PORT}")
     print(f"📚 Docs available at http://{settings.HOST}:{settings.PORT}/docs")
+
+    # Restart monitors that were running before shutdown
+    monitors_to_restart = alert_service.get_monitors_to_restart()
+    if monitors_to_restart:
+        print(f"\n🔄 Restarting {len(monitors_to_restart)} monitor(s)...")
+        for monitor_id in monitors_to_restart:
+            # Mark as running
+            alert_service.active_monitors[monitor_id]["running"] = True
+            # Start monitoring in background
+            asyncio.create_task(alert_service.monitor_match(monitor_id))
+            print(f"  ✅ Restarted monitor {monitor_id}")
+        print()
 
 @app.on_event("shutdown")
 async def shutdown_event():

@@ -19,3 +19,6 @@ ENV/
 
 # Logs
 *.log
+
+# Data storage (temporary - will be replaced with database)
+data/

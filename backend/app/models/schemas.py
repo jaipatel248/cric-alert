@@ -19,8 +19,8 @@ class AlertResponse(BaseModel):
     monitor_id: str
     match_id: int
     alert_text: str
-    rules: Dict[str, Any]
-    status: Literal["monitoring", "approaching", "imminent", "triggered", "aborted", "completed", "stopped", "error", "deleted"]
+    rules: Optional[Dict[str, Any]] = None
+    status: MonitorStatus
     message: str
     created_at: str
 
@@ -43,7 +43,7 @@ class MonitorInfo(BaseModel):
     match_id: int
     alert_text: str
     running: bool
-    status: Literal["monitoring", "approaching", "imminent", "triggered", "aborted", "completed", "stopped", "error", "deleted"]
+    status: MonitorStatus
     created_at: str
     alerts_count: int
     last_alert_message: Optional[str] = None
@@ -52,7 +52,7 @@ class MonitorInfo(BaseModel):
 
 class MonitorDetail(MonitorInfo):
     """Detailed monitor information including recent alerts"""
-    rules: Dict[str, Any]
+    rules: Optional[Dict[str, Any]] = {}
     recent_alerts: List[Dict[str, Any]]
 
 

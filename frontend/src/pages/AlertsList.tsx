@@ -24,6 +24,8 @@ import {
 import DeleteIcon from "@mui/icons-material/Delete";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import VisibilityIcon from "@mui/icons-material/Visibility";
+import PlayArrowIcon from "@mui/icons-material/PlayArrow";
+import StopIcon from "@mui/icons-material/Stop";
 import { alertAPI } from "../services/api";
 import { AlertMonitor, MonitorStatus } from "../types";
 
@@ -72,12 +74,34 @@ const AlertsList: React.FC = () => {
     }
   };
 
+  const handleStop = async (monitorId: string) => {
+    try {
+      await alertAPI.stop(monitorId);
+      setSuccess("Alert stopped successfully");
+      fetchAlerts();
+    } catch (err: any) {
+      setError(err.response?.data?.detail || "Failed to stop alert");
+    }
+  };
+
+  const handleStart = async (monitorId: string) => {
+    try {
+      await alertAPI.start(monitorId);
+      setSuccess("Alert started successfully");
+      fetchAlerts();
+    } catch (err: any) {
+      setError(err.response?.data?.detail || "Failed to start alert");
+    }
+  };
+
   const getStatusColor = (status?: MonitorStatus) => {
     switch (status) {
+      case "initializing":
+        return "default";
       case "monitoring":
         return "info";
       case "approaching":
-        return "info"; 
+        return "info";
       case "imminent":
         return "warning";
       case "triggered":
@@ -85,7 +109,7 @@ const AlertsList: React.FC = () => {
       case "aborted":
         return "error";
       case "completed":
-        return "success"; 
+        return "success";
       case "stopped":
         return "default";
       case "error":
@@ -248,10 +272,31 @@ const AlertsList: React.FC = () => {
                         size='small'
                         onClick={() => navigate(`/alerts/${alert.monitor_id}`)}
                         title='View details'
-                        sx={{ mr: 1 }}
                       >
                         <VisibilityIcon />
                       </IconButton>
+                      {alert.status === "monitoring" ||
+                      alert.status === "approaching" ||
+                      alert.status === "imminent" ? (
+                        <IconButton
+                          color='warning'
+                          size='small'
+                          onClick={() => handleStop(alert.monitor_id)}
+                          title='Stop monitoring'
+                        >
+                          <StopIcon />
+                        </IconButton>
+                      ) : alert.status === "stopped" ||
+                        alert.status === "error" ? (
+                        <IconButton
+                          color='success'
+                          size='small'
+                          onClick={() => handleStart(alert.monitor_id)}
+                          title='Start monitoring'
+                        >
+                          <PlayArrowIcon />
+                        </IconButton>
+                      ) : null}
                       <IconButton
                         color='error'
                         size='small'
