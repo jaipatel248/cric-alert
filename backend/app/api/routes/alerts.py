@@ -98,7 +98,7 @@ async def start_alert(monitor_id: str, background_tasks: BackgroundTasks):
         )
 
     # Start monitoring in background
-    background_tasks.add_task(alert_service.monitor_match, monitor_id)
+    background_tasks.add_task(alert_service.start_monitor_background, monitor_id)
 
     return {
         "monitor_id": monitor_id,

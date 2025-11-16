@@ -200,7 +200,7 @@ class AlertService:
         return True
 
     def start_monitor(self, monitor_id: str) -> bool:
-        """Start a stopped monitor"""
+        """Start a stopped monitor (updates state, returns success)"""
         if monitor_id not in self.active_monitors:
             return False
 
@@ -224,6 +224,10 @@ class AlertService:
         file_storage.save_monitor(monitor_id, monitor)
 
         return True
+
+    async def start_monitor_background(self, monitor_id: str):
+        """Start monitoring in background"""
+        asyncio.run(self.monitor_match(monitor_id))
 
     def delete_monitor(self, monitor_id: str) -> bool:
         """Delete a monitor"""

@@ -22,27 +22,39 @@ import {
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import DeleteIcon from "@mui/icons-material/Delete";
+import PlayArrowIcon from "@mui/icons-material/PlayArrow";
+import StopIcon from "@mui/icons-material/Stop";
 import { alertAPI } from "../services/api";
 import { AlertMonitor, AlertType, MonitorStatus } from "../types";
+import { useMonitorActions } from "../hooks/useMonitorActions";
+import DeleteMonitorDialog from "../components/DeleteMonitorDialog";
 
 const AlertDetail: React.FC = () => {
   const { monitorId } = useParams<{ monitorId: string }>();
   const navigate = useNavigate();
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [monitor, setMonitor] = useState<AlertMonitor | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const {
+    deleteMonitor,
+    stopMonitor,
+    startMonitor,
+    loadingMonitorId,
+    loadingAction,
+  } = useMonitorActions();
 
   const fetchMonitorDetail = useCallback(async () => {
     if (!monitorId) return;
-
     try {
       const data = await alertAPI.get(monitorId);
       setMonitor(data);
-      setLoading(false);
     } catch (err: any) {
       setError(err.response?.data?.detail || "Failed to fetch monitor details");
+    } finally {
       setLoading(false);
     }
   }, [monitorId]);
@@ -58,50 +70,50 @@ const AlertDetail: React.FC = () => {
     }
   }, [monitorId, fetchMonitorDetail]);
 
-  const handleDelete = useCallback(async () => {
-    if (
-      !monitorId ||
-      !window.confirm("Are you sure you want to delete this monitor?")
-    ) {
-      return;
-    }
-
-    try {
-      await alertAPI.delete(monitorId);
-      navigate("/alerts");
-    } catch (err: any) {
-      setError(err.response?.data?.detail || "Failed to delete monitor");
-    }
-  }, [monitorId, navigate]);
+  // Action handlers
+  const handleStart = useCallback(async () => {
+    if (!monitor) return;
+    await startMonitor(
+      monitor.monitor_id,
+      (msg) => {
+        setSuccess(msg);
+        fetchMonitorDetail();
+      },
+      (err) => setError(err)
+    );
+  }, [monitor, startMonitor, fetchMonitorDetail]);
 
   const handleStop = useCallback(async () => {
-    if (!monitorId) return;
+    if (!monitor) return;
+    await stopMonitor(
+      monitor.monitor_id,
+      (msg) => {
+        setSuccess(msg);
+        fetchMonitorDetail();
+      },
+      (err) => setError(err)
+    );
+  }, [monitor, stopMonitor, fetchMonitorDetail]);
 
-    try {
-      await alertAPI.stop(monitorId);
-      fetchMonitorDetail();
-    } catch (err: any) {
-      setError(err.response?.data?.detail || "Failed to stop monitor");
-    }
-  }, [monitorId, fetchMonitorDetail]);
-
-  const handleStart = useCallback(async () => {
-    if (!monitorId) return;
-
-    try {
-      await alertAPI.start(monitorId);
-      fetchMonitorDetail();
-    } catch (err: any) {
-      setError(err.response?.data?.detail || "Failed to start monitor");
-    }
-  }, [monitorId, fetchMonitorDetail]);
+  const handleDelete = useCallback(async () => {
+    if (!monitor) return;
+    await deleteMonitor(
+      monitor.monitor_id,
+      (msg) => {
+        setSuccess(msg);
+        navigate("/alerts");
+      },
+      (err) => setError(err)
+    );
+    setDeleteDialogOpen(false);
+  }, [monitor, deleteMonitor, navigate]);
 
   const getStatusColor = useCallback((status?: MonitorStatus) => {
     switch (status) {
       case "monitoring":
         return "info";
       case "approaching":
-        return "info"; 
+        return "info";
       case "imminent":
         return "warning";
       case "triggered":
@@ -142,13 +154,13 @@ const AlertDetail: React.FC = () => {
   const getAlertTypeLabel = useCallback((type: AlertType): string => {
     switch (type) {
       case "SOFT_ALERT":
-        return "Approaching"; 
+        return "Approaching";
       case "HARD_ALERT":
-        return "Imminent"; 
+        return "Imminent";
       case "TRIGGER":
-        return "Triggered"; 
+        return "Triggered";
       case "ABORTED":
-        return "Aborted"; 
+        return "Aborted";
       case "INFO":
         return "Info";
     }
@@ -213,37 +225,100 @@ const AlertDetail: React.FC = () => {
         <Box display='flex' gap={1}>
           <Button
             variant='outlined'
+            disabled={loading}
             startIcon={!isMobile ? <RefreshIcon /> : undefined}
             onClick={fetchMonitorDetail}
           >
             {isMobile ? <RefreshIcon /> : "Refresh"}
           </Button>
-          {isRunning ? (
-            <Button variant='outlined' color='warning' onClick={handleStop}>
-              Stop
-            </Button>
-          ) : (
-            <Button
-              variant='outlined'
-              color='success'
-              onClick={handleStart}
-              disabled={
-                monitor.status === "initializing" || monitor.status === "error"
-              }
-            >
-              Start
-            </Button>
+          {monitor && (
+            <>
+              {monitor.status === "monitoring" ||
+              monitor.status === "approaching" ||
+              monitor.status === "imminent" ||
+              monitor.status === "initializing" ? (
+                <Button
+                  variant='outlined'
+                  color='warning'
+                  onClick={handleStop}
+                  disabled={loadingMonitorId === monitor.monitor_id}
+                  startIcon={
+                    loadingAction === "stop" &&
+                    loadingMonitorId === monitor.monitor_id ? (
+                      <CircularProgress size={16} />
+                    ) : (
+                      <StopIcon />
+                    )
+                  }
+                >
+                  {loadingAction === "stop" &&
+                  loadingMonitorId === monitor.monitor_id
+                    ? "Stopping..."
+                    : "Stop"}
+                </Button>
+              ) : monitor.status === "stopped" || monitor.status === "error" ? (
+                <Button
+                  variant='outlined'
+                  color='success'
+                  onClick={handleStart}
+                  disabled={loadingMonitorId === monitor.monitor_id}
+                  startIcon={
+                    loadingAction === "start" &&
+                    loadingMonitorId === monitor.monitor_id ? (
+                      <CircularProgress size={16} />
+                    ) : (
+                      <PlayArrowIcon />
+                    )
+                  }
+                >
+                  {loadingAction === "start" &&
+                  loadingMonitorId === monitor.monitor_id
+                    ? "Starting..."
+                    : "Start"}
+                </Button>
+              ) : null}
+              <Button
+                variant='outlined'
+                color='error'
+                onClick={() => setDeleteDialogOpen(true)}
+                disabled={loadingMonitorId === monitor.monitor_id}
+                startIcon={
+                  loadingAction === "delete" &&
+                  loadingMonitorId === monitor.monitor_id ? (
+                    <CircularProgress size={16} />
+                  ) : !isMobile ? (
+                    <DeleteIcon />
+                  ) : undefined
+                }
+              >
+                {loadingAction === "delete" &&
+                loadingMonitorId === monitor.monitor_id ? (
+                  "Deleting..."
+                ) : isMobile ? (
+                  <DeleteIcon />
+                ) : (
+                  "Delete"
+                )}
+              </Button>
+            </>
           )}
-          <Button
-            variant='outlined'
-            color='error'
-            startIcon={!isMobile ? <DeleteIcon /> : undefined}
-            onClick={handleDelete}
-          >
-            {isMobile ? <DeleteIcon /> : "Delete"}
-          </Button>
         </Box>
       </Box>
+
+      {error && (
+        <Alert severity='error' sx={{ mb: 3 }} onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
+      {success && (
+        <Alert
+          severity='success'
+          sx={{ mb: 3 }}
+          onClose={() => setSuccess(null)}
+        >
+          {success}
+        </Alert>
+      )}
 
       {/* Monitor Info Card */}
       <Paper sx={{ p: 3, mb: 3 }}>
@@ -547,6 +622,15 @@ const AlertDetail: React.FC = () => {
           )}
         </Stack>
       </Paper>
+
+      <DeleteMonitorDialog
+        open={deleteDialogOpen}
+        onClose={() => setDeleteDialogOpen(false)}
+        onConfirm={handleDelete}
+        loading={
+          loadingAction === "delete" && loadingMonitorId === monitor.monitor_id
+        }
+      />
     </Box>
   );
 };
