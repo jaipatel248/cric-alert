@@ -109,6 +109,34 @@ export interface ExpectedNextCheck {
   reasoning: string;
 }
 
+export interface AlertEntity {
+  id?: number;
+  name?: string;
+  teamShort?: string;
+}
+
+export interface AlertContext {
+  currentValue?: number;
+  target?: number;
+  runsToTarget?: number;
+  ballNbr?: number;
+  overNumber?: number;
+  event?: string;
+  [key: string]: any;
+}
+
+export interface RecentAlert {
+  type: AlertType;
+  entityType?: string;
+  entity?: AlertEntity;
+  inningsId?: number;
+  matchId?: number;
+  context?: AlertContext;
+  reason?: string;
+  message: string;
+  timestamp: string;
+}
+
 export interface AlertMonitor {
   monitor_id: string;
   match_id: number;
@@ -119,16 +147,11 @@ export interface AlertMonitor {
   triggered_at?: string;
   triggered_count: number;
   rules?: any;
+  running?: boolean;
   alerts_count?: number;
   last_alert_message?: string;
   expectedNextCheck?: ExpectedNextCheck;
-  recent_alerts?: Array<{
-    type: AlertType;
-    entityType?: string;
-    message: string;
-    context?: any;
-    timestamp: string;
-  }>;
+  recent_alerts?: RecentAlert[];
 }
 
 export interface AlertResponse {

@@ -27,7 +27,9 @@ import StopIcon from "@mui/icons-material/Stop";
 import { alertAPI } from "../services/api";
 import { AlertMonitor, AlertType, MonitorStatus } from "../types";
 import { useMonitorActions } from "../hooks/useMonitorActions";
+import { useWebSocket, WebSocketMessageType, WebSocketMessage } from "../hooks/useWebSocket";
 import DeleteMonitorDialog from "../components/DeleteMonitorDialog";
+import TriggerAlertDialog from "../components/TriggerAlertDialog";
 
 const AlertDetail: React.FC = () => {
   const { monitorId } = useParams<{ monitorId: string }>();
@@ -59,16 +61,144 @@ const AlertDetail: React.FC = () => {
     }
   }, [monitorId]);
 
+  // WebSocket connection for real-time updates
+  const { isConnected } = useWebSocket(monitorId, {
+    onMessage: useCallback(
+      (message: WebSocketMessage) => {
+        console.log("WebSocket message received:", message);
+
+        switch (message.type) {
+          case WebSocketMessageType.MONITOR_UPDATE:
+            // Full monitor update
+            if (message.data) {
+              setMonitor((prev) => {
+                if (prev) {
+                  return { ...prev, ...message.data } as AlertMonitor;
+                }
+                return message.data as AlertMonitor;
+              });
+              setLoading(false);
+            }
+            break;
+
+          case WebSocketMessageType.NEW_ALERT:
+            // New alert received - update monitor state
+            if (message.data?.alert && monitor) {
+              setMonitor((prev) => {
+                if (!prev) return prev;
+
+                // Check for duplicate alert by comparing timestamp and message
+                const alertId = `${message.data.alert.type}-${message.data.alert.timestamp}-${message.data.alert.message}`;
+                const isDuplicate = prev.recent_alerts?.some(
+                  (a) => `${a.type}-${a.timestamp}-${a.message}` === alertId
+                );
+
+                if (isDuplicate) {
+                  console.log("Duplicate alert detected, skipping:", alertId);
+                  return prev;
+                }
+
+                // Play alert sound for TRIGGER or ABORTED alerts
+                if (message.data.alert.type === 'TRIGGER' || message.data.alert.type === 'ABORTED') {
+                  try {
+                    const audio = new Audio('/notification.mp3');
+                    audio.play().catch((err) => console.log('Audio playback failed:', err));
+                  } catch (err) {
+                    console.log('Audio creation failed:', err);
+                  }
+                }
+
+                return {
+                  ...prev,
+                  recent_alerts: [
+                    ...(prev.recent_alerts || []),
+                    message.data.alert,
+                  ],
+                  alerts_count: (prev.alerts_count || 0) + 1,
+                  last_alert_message: message.data.alert.message,
+                };
+              });
+            }
+            break;
+
+          case WebSocketMessageType.STATUS_CHANGE:
+            // Status change received
+            if (message.data && monitor) {
+              setMonitor((prev) => {
+                if (!prev) return prev;
+                return {
+                  ...prev,
+                  status: message.data.status,
+                  running:
+                    message.data.running !== undefined
+                      ? message.data.running
+                      : prev.running,
+                };
+              });
+            }
+            break;
+
+          case WebSocketMessageType.EXPECTED_NEXT_CHECK_UPDATE:
+            // Expected next check update
+            if (message.data?.expectedNextCheck && monitor) {
+              setMonitor((prev) => {
+                if (!prev) return prev;
+                return {
+                  ...prev,
+                  expectedNextCheck: message.data.expectedNextCheck,
+                };
+              });
+            }
+            break;
+        }
+      },
+      [monitor]
+    ),
+    onConnect: useCallback(() => {
+      console.log("✅ Connected to WebSocket");
+    }, []),
+    onDisconnect: useCallback(() => {
+      console.log("❌ Disconnected from WebSocket");
+    }, []),
+  });
+
+  // Initial fetch on mount
   useEffect(() => {
     if (monitorId) {
       fetchMonitorDetail();
-      // Poll every 10 seconds
-      const interval = setInterval(() => {
-        fetchMonitorDetail();
-      }, 30000);
-      return () => clearInterval(interval);
     }
   }, [monitorId, fetchMonitorDetail]);
+
+  // Trigger modal: show when a new TRIGGER alert appears
+  const [triggerDialogOpen, setTriggerDialogOpen] = useState(false);
+  const [triggeredAlert, setTriggeredAlert] = useState<any | null>(null);
+  const previousAlertsRef = React.useRef<string[]>([]);
+
+  useEffect(() => {
+    if (!monitor || !monitor.recent_alerts) return;
+
+    // Build a set of current alert identifiers
+    const currentAlertIds = monitor.recent_alerts.map(
+      (a) => `${a.type}-${a.timestamp}-${a.message}`
+    );
+
+    // Find TRIGGER alerts that are new (not in previous state)
+    const newTriggers = monitor.recent_alerts.filter((alert) => {
+      if (alert.type !== "TRIGGER") return false;
+      const alertId = `${alert.type}-${alert.timestamp}-${alert.message}`;
+      return !previousAlertsRef.current.includes(alertId);
+    });
+
+    // Update the ref with current state for next comparison
+    previousAlertsRef.current = currentAlertIds;
+
+    // Show dialog for the newest new TRIGGER alert
+    if (newTriggers.length > 0) {
+      const newestTrigger = newTriggers[newTriggers.length - 1];
+      setTriggeredAlert(newestTrigger);
+      setTriggerDialogOpen(true);
+    }
+  }, [monitor]);
 
   // Action handlers
   const handleStart = useCallback(async () => {
@@ -221,6 +351,13 @@ const AlertDetail: React.FC = () => {
           <Typography variant='h4' fontWeight='bold'>
             Alert Details
           </Typography>
+          {/* WebSocket connection indicator */}
+          <Chip
+            label={isConnected ? "Live" : "Disconnected"}
+            color={isConnected ? "success" : "default"}
+            size='small'
+            sx={{ fontSize: "0.75rem" }}
+          />
         </Box>
         <Box display='flex' gap={1}>
           <Button
@@ -431,14 +568,10 @@ const AlertDetail: React.FC = () => {
                           </Typography>
                           <Typography variant='body2' fontWeight='medium'>
                             ~
-                            {Math.round(
-                              monitor.expectedNextCheck.estimatedMinutes * 60
-                            )}
-                            s (
                             {monitor.expectedNextCheck.estimatedMinutes.toFixed(
                               1
                             )}{" "}
-                            min)
+                            mins
                           </Typography>
                         </Box>
                       </Grid>
@@ -630,6 +763,12 @@ const AlertDetail: React.FC = () => {
         loading={
           loadingAction === "delete" && loadingMonitorId === monitor.monitor_id
         }
+      />
+
+      <TriggerAlertDialog
+        open={triggerDialogOpen}
+        alert={triggeredAlert}
+        onClose={() => setTriggerDialogOpen(false)}
       />
     </Box>
   );

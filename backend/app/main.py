@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 from app.core.config import settings
-from app.api.routes import alerts, matches, health
+from app.api.routes import alerts, matches, health, websocket
 from app.services.alert_service import alert_service
 
 # Create FastAPI app
@@ -30,6 +30,7 @@ app.add_middleware(
 app.include_router(health.router, tags=["health"])
 app.include_router(matches.router, prefix="/api/v1/matches", tags=["matches"])
 app.include_router(alerts.router, prefix="/api/v1/alerts", tags=["alerts"])
+app.include_router(websocket.router, prefix="/api/v1", tags=["websocket"])
 
 @app.on_event("startup")
 async def startup_event():

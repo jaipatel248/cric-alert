@@ -20,6 +20,10 @@ servers:
     description: Local development server
   - url: https://api.crickalert.com
     description: Production server
+  - url: ws://localhost:8000
+    description: WebSocket server (local development)
+  - url: wss://api.crickalert.com
+    description: WebSocket server (production)
 
 tags:
   - name: Health
@@ -28,6 +32,8 @@ tags:
     description: Cricket match information and status
   - name: Alerts
     description: Alert monitoring and management
+  - name: WebSocket
+    description: Real-time WebSocket connections for live updates
 
 paths:
   /health:
@@ -388,6 +394,51 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
 
+  /api/v1/ws/{monitor_id}:
+    get:
+      tags:
+        - WebSocket
+      summary: WebSocket connection for real-time updates
+      description: |
+        Establish a WebSocket connection to receive real-time updates for a specific monitor.
+        
+        Message types received:
+        - `monitor_update`: Full monitor state update
+        - `new_alert`: New alert triggered
+        - `status_change`: Monitor status changed
+        - `expected_next_check_update`: Next check estimation updated
+        - `pong`: Response to ping keepalive
+        
+        Client can send:
+        - `ping`: Keepalive message
+        - `refresh`: Request current monitor state
+        
+        Notes:
+        - For `monitor_update`, the server may send either a full snapshot or a partial update containing only changed fields. Clients should handle missing properties gracefully.
+      operationId: websocketConnection
+      parameters:
+        - name: monitor_id
+          in: path
+          required: true
+          description: Monitor ID to subscribe to
+          schema:
+            type: string
+            example: "117371_1731619200000"
+      responses:
+        '101':
+          description: Switching Protocols - WebSocket connection established
+        '400':
+          description: Bad request - Invalid monitor ID
+        '404':
+          description: Monitor not found
+      x-websocket:
+        description: |
+          WebSocket connection details
+        receive:
+          $ref: '#/components/schemas/WebSocketMessage'
+        send:
+          $ref: '#/components/schemas/WebSocketClientMessage'
+
 components:
   schemas:
     HealthResponse:
@@ -744,3 +795,156 @@ components:
           format: date-time
           example: "2025-11-15T10:30:00"
           description: Error timestamp
+
+    WebSocketMessage:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum:
+            - monitor_update
+            - new_alert
+            - status_change
+            - expected_next_check_update
+            - pong
+          description: |
+            WebSocket message type:
+            - monitor_update: Full monitor state sent to client
+            - new_alert: New alert has been triggered
+            - status_change: Monitor status has changed
+            - expected_next_check_update: Next check estimation updated
+            - pong: Response to ping keepalive
+        data:
+          oneOf:
+            - $ref: '#/components/schemas/MonitorDetail'
+            - $ref: '#/components/schemas/WebSocketMonitorPartial'
+            - $ref: '#/components/schemas/WebSocketNewAlert'
+            - $ref: '#/components/schemas/WebSocketStatusChange'
+            - $ref: '#/components/schemas/WebSocketExpectedNextCheck'
+          description: |
+            Message payload (depends on message type). For `monitor_update`, server may send
+            either a full `MonitorDetail` snapshot or a partial update via `WebSocketMonitorPartial`.
+
+    WebSocketMonitorPartial:
+      type: object
+      description: |
+        Partial monitor update payload. Fields are optional and only changed values may be present.
+        Clients should merge this into the existing monitor state.
+      properties:
+        monitor_id:
+          type: string
+          example: "117371_1731619200000"
+        match_id:
+          type: integer
+          example: 117371
+        alert_text:
+          type: string
+        running:
+          type: boolean
+        status:
+          type: string
+          enum:
+            - initializing
+            - monitoring
+            - approaching
+            - imminent
+            - triggered
+            - aborted
+            - completed
+            - stopped
+            - error
+            - deleted
+        created_at:
+          type: string
+          format: date-time
+        alerts_count:
+          type: integer
+        last_alert_message:
+          type: string
+          nullable: true
+        expectedNextCheck:
+          $ref: '#/components/schemas/MonitorInfo/properties/expectedNextCheck'
+        rules:
+          type: object
+          description: Parsed alert rules from LLM
+        recent_alerts:
+          type: array
+          items:
+            $ref: '#/components/schemas/Alert'
+
+    WebSocketNewAlert:
+      type: object
+      required:
+        - monitor_id
+        - alert
+      properties:
+        monitor_id:
+          type: string
+          example: "117371_1731619200000"
+        alert:
+          $ref: '#/components/schemas/Alert'
+
+    WebSocketStatusChange:
+      type: object
+      required:
+        - monitor_id
+        - status
+      properties:
+        monitor_id:
+          type: string
+          example: "117371_1731619200000"
+        status:
+          type: string
+          enum:
+            - initializing
+            - monitoring
+            - approaching
+            - imminent
+            - triggered
+            - aborted
+            - completed
+            - stopped
+            - error
+            - deleted
+        running:
+          type: boolean
+          description: Whether monitor is running (optional)
+
+    WebSocketExpectedNextCheck:
+      type: object
+      required:
+        - monitor_id
+        - expectedNextCheck
+      properties:
+        monitor_id:
+          type: string
+          example: "117371_1731619200000"
+        expectedNextCheck:
+          type: object
+          properties:
+            estimatedMinutes:
+              type: number
+              format: float
+            estimatedBalls:
+              type: integer
+            reasoning:
+              type: string
+
+    WebSocketClientMessage:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum:
+            - ping
+            - refresh
+          description: Client-sent message type
+        data:
+          type: object
+          nullable: true
+          additionalProperties: true
+          description: Optional payload for future client messages

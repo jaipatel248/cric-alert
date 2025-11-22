@@ -73,7 +73,7 @@ const MatchMonitor: React.FC = () => {
       setAlertText("");
 
       // Redirect to alert details page
-      navigate("/alerts" + `/${response.monitor_id}`);
+      navigate(`/alerts/${response.monitor_id}`);
     } catch (err: any) {
       setError(err.response?.data?.detail || "Failed to create alert");
     } finally {

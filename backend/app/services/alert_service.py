@@ -10,8 +10,10 @@ from app.services.watcher import AlertWatcher
 from app.services.scheduler import AdaptiveScheduler
 from app.services.cricket_service import cricket_service
 from app.services.storage import file_storage
+from app.services.websocket_manager import websocket_manager
 from app.core.config import settings
 from app.models.enums import AlertType, MonitorStatus
+from app.models.websocket_types import WebSocketMessageType
 
 
 class AlertService:
@@ -21,6 +23,52 @@ class AlertService:
         self.active_monitors: Dict[str, dict] = {}
         self.gemini_client = GeminiClient()
         self._restore_monitors()
+
+    async def _broadcast_monitor_update(self, monitor_id: str):
+        """Broadcast full monitor update via WebSocket"""
+        monitor = self.get_monitor(monitor_id)
+        if monitor:
+            await websocket_manager.broadcast_to_monitor(
+                monitor_id,
+                {"type": WebSocketMessageType.MONITOR_UPDATE, "data": monitor},
+            )
+
+    async def _broadcast_new_alert(self, monitor_id: str, alert: dict):
+        """Broadcast new alert via WebSocket"""
+        await websocket_manager.broadcast_to_monitor(
+            monitor_id,
+            {
+                "type": WebSocketMessageType.NEW_ALERT,
+                "data": {"monitor_id": monitor_id, "alert": alert},
+            },
+        )
+
+    async def _broadcast_status_change(
+        self, monitor_id: str, status: str, running: bool = None
+    ):
+        """Broadcast status change via WebSocket"""
+        data = {"monitor_id": monitor_id, "status": status}
+        if running is not None:
+            data["running"] = running
+
+        await websocket_manager.broadcast_to_monitor(
+            monitor_id, {"type": WebSocketMessageType.STATUS_CHANGE, "data": data}
+        )
+
+    async def _broadcast_expected_next_check(
+        self, monitor_id: str, expected_next_check: dict
+    ):
+        """Broadcast expected next check update via WebSocket"""
+        await websocket_manager.broadcast_to_monitor(
+            monitor_id,
+            {
+                "type": WebSocketMessageType.EXPECTED_NEXT_CHECK_UPDATE,
+                "data": {
+                    "monitor_id": monitor_id,
+                    "expectedNextCheck": expected_next_check,
+                },
+            },
+        )
 
     def _restore_monitors(self):
         """Restore monitors from file storage on startup"""
@@ -301,6 +349,12 @@ class AlertService:
                         monitor["expectedNextCheck"] = result["expectedNextCheck"] or {}
                         # Persist updated expectedNextCheck
                         file_storage.save_monitor(monitor_id, monitor)
+
+                        # Broadcast expectedNextCheck update via WebSocket
+                        await self._broadcast_expected_next_check(
+                            monitor_id, monitor["expectedNextCheck"]
+                        )
+
                     if result.get("alert"):
                         alert = result["alert"]
                         # attach timestamp
@@ -315,32 +369,50 @@ class AlertService:
                             f"🚨 Alert [{alert_type}]: {alert.get('message', 'No message')}"
                         )
 
+                        # Broadcast new alert via WebSocket
+                        await self._broadcast_new_alert(monitor_id, alert)
+
                         # Align monitor status with alert type
                         if alert_type == AlertType.TRIGGER.value:
                             # Target reached - stop monitoring
                             monitor["running"] = False
                             monitor["status"] = MonitorStatus.TRIGGERED.value
                             file_storage.save_monitor(monitor_id, monitor)
+                            await self._broadcast_status_change(
+                                monitor_id, MonitorStatus.TRIGGERED.value, running=False
+                            )
                             print(f"✅ Monitor {monitor_id} triggered - target reached")
                             break
+
                         elif alert_type == AlertType.ABORTED.value:
                             # Cannot reach target anymore - stop monitoring
                             monitor["running"] = False
                             monitor["status"] = MonitorStatus.ABORTED.value
                             file_storage.save_monitor(monitor_id, monitor)
+                            await self._broadcast_status_change(
+                                monitor_id, MonitorStatus.ABORTED.value, running=False
+                            )
                             print(
                                 f"⏹️  Monitor {monitor_id} aborted - target unreachable"
                             )
                             break
+
                         elif alert_type == AlertType.SOFT_ALERT.value:
                             # Approaching target - continue monitoring
                             monitor["status"] = MonitorStatus.APPROACHING.value
                             file_storage.save_monitor(monitor_id, monitor)
+                            await self._broadcast_status_change(
+                                monitor_id, MonitorStatus.APPROACHING.value
+                            )
                             print(f"📍 Monitor {monitor_id} approaching target")
+
                         elif alert_type == AlertType.HARD_ALERT.value:
                             # Very close to target - continue monitoring
                             monitor["status"] = MonitorStatus.IMMINENT.value
                             file_storage.save_monitor(monitor_id, monitor)
+                            await self._broadcast_status_change(
+                                monitor_id, MonitorStatus.IMMINENT.value
+                            )
                             print(
                                 f"🔥 Monitor {monitor_id} imminent - very close to target"
                             )
