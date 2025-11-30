@@ -12,18 +12,18 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 class Settings(BaseSettings):
     """Application settings"""
-    
+
     # App
     APP_NAME: str = "Cricket Alert API"
     VERSION: str = "1.0.0"
     HOST: str = "0.0.0.0"
     PORT: int = 8000
     DEBUG: bool = True
-    
+
     # Paths
     BASE_DIR: Path = BASE_DIR
     PROMPTS_DIR: Path = BASE_DIR / "prompts"
-    
+
     # CORS
     ALLOWED_ORIGINS: List[str] = [
         "http://localhost:3000",
@@ -31,15 +31,19 @@ class Settings(BaseSettings):
         "http://localhost:8000",
         "*"  # Allow all origins in development
     ]
-    
+
     # API Keys
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
-    
+
+    # Firebase
+    FIREBASE_CREDENTIALS_PATH: str = os.getenv("FIREBASE_CREDENTIALS_PATH", "")
+    FIREBASE_DATABASE_URL: str = os.getenv("FIREBASE_DATABASE_URL", "")
+
     # Monitoring
     DEFAULT_POLL_INTERVAL: int = 60  # seconds
     MIN_POLL_INTERVAL: int = 10
     MAX_POLL_INTERVAL: int = 300
-    
+
     class Config:
         env_file = ".env"
         case_sensitive = True

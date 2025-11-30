@@ -1,58 +1,42 @@
 """
-Simple file-based storage for temporary data persistence.
-This will be replaced with a proper database later.
+Firebase Realtime Database storage for data persistence.
 """
-import json
+
 import os
 from datetime import datetime
-from typing import Dict, List, Optional, Any
-from pathlib import Path
+from typing import Dict, List, Optional
 import threading
+import firebase_admin
+from firebase_admin import credentials, db
 
 
-class FileStorage:
-    """Simple JSON file-based storage"""
+class FirebaseStorage:
+    """Firebase Realtime Database storage"""
 
-    def __init__(self, data_dir: str = "data"):
-        self.data_dir = Path(data_dir)
-        self.data_dir.mkdir(exist_ok=True)
-        
-        self.monitors_file = self.data_dir / "monitors.json"
-        self.alerts_file = self.data_dir / "alerts.json"
+    def __init__(self):
         self.lock = threading.Lock()
-        
-        # Initialize files if they don't exist
-        self._init_files()
 
-    def _init_files(self):
-        """Initialize storage files"""
-        if not self.monitors_file.exists():
-            self._write_json(self.monitors_file, {})
-        if not self.alerts_file.exists():
-            self._write_json(self.alerts_file, {})
+        # Read from environment variables
+        database_url = os.getenv("FIREBASE_DATABASE_URL")
+        credentials_path = os.getenv("FIREBASE_CREDENTIALS_PATH")
 
-    def _read_json(self, file_path: Path) -> Dict:
-        """Read JSON file safely"""
-        try:
-            with open(file_path, 'r') as f:
-                return json.load(f)
-        except (FileNotFoundError, json.JSONDecodeError):
-            return {}
+        # Initialize Firebase Admin SDK
+        if not firebase_admin._apps:
+            # Initialize with credentials if provided
+            if credentials_path and os.path.exists(credentials_path):
+                cred = credentials.Certificate(credentials_path)
+                firebase_admin.initialize_app(cred, {"databaseURL": database_url})
+            else:
+                # Initialize without credentials for public database access
+                firebase_admin.initialize_app(options={"databaseURL": database_url})
 
-    def _write_json(self, file_path: Path, data: Dict):
-        """Write JSON file safely"""
-        # Write to temp file first, then rename for atomicity
-        temp_file = file_path.with_suffix('.tmp')
-        with open(temp_file, 'w') as f:
-            json.dump(data, f, indent=2, default=str)
-        temp_file.replace(file_path)
+        self.monitors_ref = db.reference("monitors")
+        self.alerts_ref = db.reference("alerts")
 
     # Monitor operations
     def save_monitor(self, monitor_id: str, monitor_data: Dict):
         """Save or update a monitor"""
         with self.lock:
-            monitors = self._read_json(self.monitors_file)
-            
             # Remove non-serializable objects (watcher, scheduler)
             serializable_data = {
                 "monitor_id": monitor_id,
@@ -65,28 +49,27 @@ class FileStorage:
                 "expectedNextCheck": monitor_data.get("expectedNextCheck"),
                 "updated_at": datetime.now().isoformat()
             }
-            
-            monitors[monitor_id] = serializable_data
-            self._write_json(self.monitors_file, monitors)
+
+            self.monitors_ref.child(monitor_id).set(serializable_data)
 
     def get_monitor(self, monitor_id: str) -> Optional[Dict]:
         """Get a monitor by ID"""
         with self.lock:
-            monitors = self._read_json(self.monitors_file)
-            return monitors.get(monitor_id)
+            data = self.monitors_ref.child(monitor_id).get()
+            return data if data else None
 
     def get_all_monitors(self) -> Dict[str, Dict]:
         """Get all monitors"""
         with self.lock:
-            return self._read_json(self.monitors_file)
+            data = self.monitors_ref.get()
+            return data if data else {}
 
     def delete_monitor(self, monitor_id: str) -> bool:
         """Delete a monitor"""
         with self.lock:
-            monitors = self._read_json(self.monitors_file)
-            if monitor_id in monitors:
-                del monitors[monitor_id]
-                self._write_json(self.monitors_file, monitors)
+            monitor = self.monitors_ref.child(monitor_id).get()
+            if monitor:
+                self.monitors_ref.child(monitor_id).delete()
                 return True
             return False
 
@@ -94,40 +77,40 @@ class FileStorage:
     def save_alert(self, monitor_id: str, alert_data: Dict):
         """Save an alert for a monitor"""
         with self.lock:
-            alerts = self._read_json(self.alerts_file)
-            
-            if monitor_id not in alerts:
-                alerts[monitor_id] = []
-            
             # Add timestamp if not present
             if "timestamp" not in alert_data:
                 alert_data["timestamp"] = datetime.now().isoformat()
-            
-            alerts[monitor_id].append(alert_data)
-            self._write_json(self.alerts_file, alerts)
+
+            # Push new alert to the list
+            self.alerts_ref.child(monitor_id).push(alert_data)
 
     def get_alerts(self, monitor_id: str) -> List[Dict]:
         """Get all alerts for a monitor"""
         with self.lock:
-            alerts = self._read_json(self.alerts_file)
-            return alerts.get(monitor_id, [])
+            data = self.alerts_ref.child(monitor_id).get()
+            if not data:
+                return []
+
+            # Convert dict to list (Firebase returns dict with auto-generated keys)
+            if isinstance(data, dict):
+                return list(data.values())
+            return data
 
     def delete_alerts(self, monitor_id: str) -> bool:
         """Delete all alerts for a monitor"""
         with self.lock:
-            alerts = self._read_json(self.alerts_file)
-            if monitor_id in alerts:
-                del alerts[monitor_id]
-                self._write_json(self.alerts_file, alerts)
+            alerts = self.alerts_ref.child(monitor_id).get()
+            if alerts:
+                self.alerts_ref.child(monitor_id).delete()
                 return True
             return False
 
     def clear_all(self):
         """Clear all data (for testing)"""
         with self.lock:
-            self._write_json(self.monitors_file, {})
-            self._write_json(self.alerts_file, {})
+            self.monitors_ref.delete()
+            self.alerts_ref.delete()
 
 
 # Global storage instance
-file_storage = FileStorage()
+file_storage = FirebaseStorage()
