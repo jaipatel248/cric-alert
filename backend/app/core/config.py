@@ -37,7 +37,6 @@ class Settings(BaseSettings):
 
     # Firebase
     FIREBASE_CREDENTIALS_PATH: str = os.getenv("FIREBASE_CREDENTIALS_PATH", "")
-    FIREBASE_DATABASE_URL: str = os.getenv("FIREBASE_DATABASE_URL", "")
 
     # Monitoring
     DEFAULT_POLL_INTERVAL: int = 60  # seconds
