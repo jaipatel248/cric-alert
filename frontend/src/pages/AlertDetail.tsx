@@ -41,6 +41,7 @@ const AlertDetail: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const latestAlertRef = React.useRef<HTMLDivElement>(null);
   const {
     deleteMonitor,
     stopMonitor,
@@ -99,14 +100,29 @@ const AlertDetail: React.FC = () => {
                 }
 
                 // Play alert sound for TRIGGER or ABORTED alerts
-                if (message.data.alert.type === 'TRIGGER' || message.data.alert.type === 'ABORTED') {
+                if (
+                  message.data.alert.type === "TRIGGER" ||
+                  message.data.alert.type === "ABORTED"
+                ) {
                   try {
-                    const audio = new Audio('/notification.mp3');
-                    audio.play().catch((err) => console.log('Audio playback failed:', err));
+                    const audio = new Audio("/notification.mp3");
+                    audio
+                      .play()
+                      .catch((err) =>
+                        console.log("Audio playback failed:", err)
+                      );
                   } catch (err) {
-                    console.log('Audio creation failed:', err);
+                    console.log("Audio creation failed:", err);
                   }
                 }
+
+                // Scroll to latest alert after state update
+                setTimeout(() => {
+                  latestAlertRef.current?.scrollIntoView({
+                    behavior: "smooth",
+                    block: "end",
+                  });
+                }, 100);
 
                 return {
                   ...prev,
@@ -650,7 +666,12 @@ const AlertDetail: React.FC = () => {
           {/* User's original alert (right side) */}
           <Box display='flex' justifyContent='flex-end'>
             <Card
-              sx={{ maxWidth: "70%", bgcolor: "primary.main", color: "white" }}
+              sx={{
+                maxWidth: "85%",
+                minWidth: "35%",
+                bgcolor: "primary.main",
+                color: "white",
+              }}
             >
               <CardContent>
                 <Typography variant='body2' sx={{ mb: 1, opacity: 0.8 }}>
@@ -670,8 +691,19 @@ const AlertDetail: React.FC = () => {
           {/* System alerts (left side) */}
           {monitor.recent_alerts && monitor.recent_alerts.length > 0 ? (
             monitor.recent_alerts.map((alert, index) => (
-              <Box key={index} display='flex' justifyContent='flex-start'>
-                <Card sx={{ maxWidth: "70%", bgcolor: "white" }}>
+              <Box
+                key={index}
+                display='flex'
+                justifyContent='flex-start'
+                ref={
+                  index === (monitor.recent_alerts?.length ?? 0) - 1
+                    ? latestAlertRef
+                    : null
+                }
+              >
+                <Card
+                  sx={{ maxWidth: "85%", minWidth: "35%", bgcolor: "white" }}
+                >
                   <CardContent>
                     <Box display='flex' alignItems='center' gap={1} mb={1}>
                       <Chip
