@@ -13,11 +13,20 @@ import {
   Chip,
   Stack,
   Divider,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  IconButton,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import AddAlertIcon from '@mui/icons-material/AddAlert';
+import VisibilityIcon from '@mui/icons-material/Visibility';
 import { matchAPI, alertAPI } from '../services/api';
-import { MatchStatus } from '../types';
+import { MatchStatus, AlertMonitor } from '../types';
+import { capitalize } from 'lodash';
 
 const MatchMonitor: React.FC = () => {
   const { matchId: urlMatchId } = useParams<{ matchId?: string }>();
@@ -26,6 +35,7 @@ const MatchMonitor: React.FC = () => {
   const [matchId, setMatchId] = useState<string>(urlMatchId || '');
   const [alertText, setAlertText] = useState<string>('');
   const [matchData, setMatchData] = useState<MatchStatus | null>(null);
+  const [activeAlerts, setActiveAlerts] = useState<AlertMonitor[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [alertLoading, setAlertLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,10 +52,22 @@ const MatchMonitor: React.FC = () => {
     try {
       const data = await matchAPI.getStatus(parseInt(matchId));
       setMatchData(data);
+      
+      // Fetch active alerts for this match
+      try {
+        const alerts = await alertAPI.getByMatch(parseInt(matchId));
+        setActiveAlerts(alerts);
+      } catch (err) {
+        console.error('Failed to fetch alerts:', err);
+        // Don't block if alerts fail to load
+        setActiveAlerts([]);
+      }
+      
       navigate(`/monitor/${matchId}`);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to fetch match data');
       setMatchData(null);
+      setActiveAlerts([]);
     } finally {
       setLoading(false);
     }
@@ -199,6 +221,65 @@ const MatchMonitor: React.FC = () => {
             </Box>
           </CardContent>
         </Card>
+      )}
+
+      {/* Active Alerts for this Match */}
+      {matchData && activeAlerts.length > 0 && (
+        <Paper sx={{ p: 3, mb: 3 }}>
+          <Typography variant='h6' gutterBottom>
+            🔔 Active Alerts for this Match ({activeAlerts.length})
+          </Typography>
+          <Divider sx={{ mb: 2 }} />
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell><strong>Alert</strong></TableCell>
+                  <TableCell><strong>Status</strong></TableCell>
+                  <TableCell align="center"><strong>Running</strong></TableCell>
+                  <TableCell align="center"><strong>Alerts</strong></TableCell>
+                  <TableCell align="center"><strong>Actions</strong></TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {activeAlerts.map((alert) => (
+                  <TableRow key={alert.monitor_id} hover>
+                    <TableCell>{alert.alert_text}</TableCell>
+                    <TableCell>
+                      <Chip 
+                        label={capitalize(alert.status || 'unknown')} 
+                        size="small"
+                        color={
+                          alert.status === 'monitoring' || alert.status === 'approaching' ? 'info' :
+                          alert.status === 'imminent' ? 'warning' :
+                          alert.status === 'triggered' ? 'success' :
+                          alert.status === 'error' ? 'error' :
+                          'default'
+                        }
+                      />
+                    </TableCell>
+                    <TableCell align="center">
+                      {alert.running ? '🟢' : '🔴'}
+                    </TableCell>
+                    <TableCell align="center">
+                      {alert.alerts_count || 0}
+                    </TableCell>
+                    <TableCell align="center">
+                      <IconButton
+                        size="small"
+                        color="primary"
+                        onClick={() => navigate(`/alerts/${alert.monitor_id}`)}
+                        title="View Details"
+                      >
+                        <VisibilityIcon />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
       )}
 
       {/* Alert Creation */}

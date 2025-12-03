@@ -234,6 +234,14 @@ class AlertService:
             result.append(self.get_monitor(monitor_id))
         return result
 
+    def get_monitors_by_match(self, match_id: int):
+        """Get all monitors for a specific match"""
+        result = []
+        for monitor_id, monitor in self.active_monitors.items():
+            if monitor.get("match_id") == match_id:
+                result.append(self.get_monitor(monitor_id))
+        return result
+
     def stop_monitor(self, monitor_id: str) -> bool:
         """Stop a monitor"""
         if monitor_id not in self.active_monitors:

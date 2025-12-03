@@ -41,6 +41,11 @@ export const alertAPI = {
     return response.data;
   },
 
+  getByMatch: async (matchId: number): Promise<AlertMonitor[]> => {
+    const response = await api.get<AlertMonitor[]>(`/api/v1/alerts/match/${matchId}`);
+    return response.data;
+  },
+
   get: async (monitorId: string): Promise<AlertMonitor> => {
     const response = await api.get<AlertMonitor>(`/api/v1/alerts/${monitorId}`);
     return response.data;

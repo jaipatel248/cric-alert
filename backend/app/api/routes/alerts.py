@@ -54,6 +54,13 @@ async def list_alerts():
     return [MonitorInfo(**m) for m in monitors]
 
 
+@router.get("/match/{match_id}", response_model=List[MonitorInfo])
+async def get_alerts_by_match(match_id: int):
+    """Get all alert monitors for a specific match"""
+    monitors = alert_service.get_monitors_by_match(match_id)
+    return [MonitorInfo(**m) for m in monitors]
+
+
 @router.get("/{monitor_id}", response_model=MonitorDetail)
 async def get_alert(monitor_id: str):
     """Get details of a specific alert monitor"""
