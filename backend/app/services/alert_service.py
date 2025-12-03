@@ -347,7 +347,9 @@ class AlertService:
                     break
 
                 # Evaluate alerts
-                result = watcher.evaluate(monitor["rules"], live_data)
+                # Extract only messages from previous alerts for deduplication
+                triggered_alert_messages = [alert.get("message", "") for alert in monitor["alerts"]]
+                result = watcher.evaluate(monitor["rules"], live_data, triggered_alert_messages)
 
                 # Store alert if triggered (single alert object from LLM)
                 if result:

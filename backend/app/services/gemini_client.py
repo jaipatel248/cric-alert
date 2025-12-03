@@ -98,6 +98,7 @@ Return ONLY the JSON, no explanation."""
         state: Dict[str, Any],
         system_prompt: str,
         user_prompt_template: str,
+        triggered_alert_messages: list = None,
     ) -> Optional[Dict[str, Any]]:
         """
         Evaluate alert rules against live data using Gemini
@@ -108,6 +109,7 @@ Return ONLY the JSON, no explanation."""
             state: Current watcher state
             system_prompt: System prompt content
             user_prompt_template: User prompt template
+            triggered_alert_messages: List of already triggered alert messages to avoid duplicates
 
         Returns:
             Alert response JSON or None on error
@@ -120,6 +122,15 @@ Return ONLY the JSON, no explanation."""
             .replace("{LIVE_JSON}", json.dumps(live_data, indent=2))
             .replace("{STATE}", json.dumps(state, indent=2))
         )
+        
+        # Replace triggered alerts placeholder with simple numbered list
+        if triggered_alert_messages:
+            alerts_str = "\n".join(f"{i+1}. {msg}" for i, msg in enumerate(triggered_alert_messages))
+            user_prompt = user_prompt.replace("{TRIGGERED_ALERTS}", alerts_str)
+        else:
+            user_prompt = user_prompt.replace("{TRIGGERED_ALERTS}", "None yet")
+        
+        user_prompt = user_prompt  # Keep the final processed prompt
 
         # Combine system prompt and user prompt
         full_prompt = f"""{system_prompt}

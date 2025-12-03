@@ -6,6 +6,11 @@ Latest live commentary payload (strict JSON):
 Current watcher state (strict JSON):
 {STATE}
 
+Already triggered alerts (DO NOT trigger these again):
+{TRIGGERED_ALERTS}
+
+IMPORTANT: Check the triggered alerts list above. Do NOT generate any alert that matches an already triggered alert (same type, entity, and reason). Only generate new, unique alerts.
+
 Return ONLY a valid JSON object in this format:
 {
   "alert": {

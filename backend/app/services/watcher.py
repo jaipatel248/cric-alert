@@ -42,7 +42,7 @@ class AlertWatcher:
         return self.gemini_client.parse_alert_rule(alert_text)
 
     def evaluate(
-        self, rules: Dict[str, Any], live_data: Dict[str, Any]
+        self, rules: Dict[str, Any], live_data: Dict[str, Any], triggered_alert_messages: List[str] = None
     ) -> Optional[Dict[str, Any]]:
         """
         Evaluate alert rules against live data
@@ -50,6 +50,7 @@ class AlertWatcher:
         Args:
             rules: Structured alert rules
             live_data: Live commentary data
+            triggered_alert_messages: List of already triggered alert messages to avoid duplicates
 
         Returns:
             Alert response with any triggered alerts
@@ -60,6 +61,7 @@ class AlertWatcher:
             state=self.state,
             system_prompt=self.system_prompt,
             user_prompt_template=self.user_prompt_template,
+            triggered_alert_messages=triggered_alert_messages or [],
         )
 
         if result and "state" in result:
